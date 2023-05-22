@@ -1,0 +1,14 @@
+domain: greatdb.com
+layout:
+- go.kubebuilder.io/v3
+projectName: greatdb-operator
+repo: greatdb-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: greatdb.com
+  kind: GreatDBPaxos
+  path: greatdb-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

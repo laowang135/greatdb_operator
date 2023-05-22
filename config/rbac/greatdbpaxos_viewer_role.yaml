@@ -1,0 +1,20 @@
+# permissions for end users to view greatdbpaxos.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: greatdbpaxos-viewer-role
+rules:
+- apiGroups:
+  - greatdb.com
+  resources:
+  - greatdbpaxos
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - greatdb.com
+  resources:
+  - greatdbpaxos/status
+  verbs:
+  - get

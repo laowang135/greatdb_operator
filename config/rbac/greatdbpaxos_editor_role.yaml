@@ -1,0 +1,24 @@
+# permissions for end users to edit greatdbpaxos.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: greatdbpaxos-editor-role
+rules:
+- apiGroups:
+  - greatdb.com
+  resources:
+  - greatdbpaxos
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - greatdb.com
+  resources:
+  - greatdbpaxos/status
+  verbs:
+  - get

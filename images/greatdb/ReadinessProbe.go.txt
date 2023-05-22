@@ -1,0 +1,44 @@
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func main() {
+	hostname := os.Getenv("HOSTNAME")
+	user := os.Getenv("ClusterUser")
+	if user == "" {
+		user = "dbscale_internal"
+	}
+	password := os.Getenv("ClusterUserPassword")
+	if password == "" {
+		password = "greatdb@dbscale"
+	}
+
+	port := os.Getenv("SERVERPORT")
+	if port == "" {
+		port = "3306"
+	}
+
+	host := fmt.Sprintf("%s:%s@tcp(%s:%s)/mysql??timeout=5s&charset=utf8mb4", user, password, hostname, port)
+
+	db, err := sql.Open("mysql", host)
+	if err != nil {
+		fmt.Printf("failed %s\n", err.Error())
+		os.Exit(1)
+		return
+	}
+
+	if err = db.Ping(); err != nil {
+		fmt.Printf("failed %s\n", err.Error())
+		os.Exit(1)
+	}
+	db.Close()
+	fmt.Println("success")
+	os.Exit(0)
+
+}
