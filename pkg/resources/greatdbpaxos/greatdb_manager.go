@@ -12,15 +12,16 @@ import (
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/resources/internal"
+	"greatdb-operator/pkg/utils/log"
 	dblog "greatdb-operator/pkg/utils/log"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 )
 
 type GreatDBManager struct {
@@ -429,49 +430,110 @@ func (great GreatDBManager) updateGreatDBPod(cluster *v1alpha1.GreatDBPaxos, pod
 		return nil
 
 	}
+	needUpdate := false
+	// update labels
+	if up := great.updateLabels(podIns, cluster); up {
+		needUpdate = true
+	}
+
+	// update annotations
+	if up := great.updateAnnotations(podIns, cluster); up {
+		needUpdate = true
+	}
+
+	// update Finalizers
+	if podIns.ObjectMeta.Finalizers == nil {
+		podIns.ObjectMeta.Finalizers = make([]string, 0, 1)
+	}
+
+	exist := false
+	for _, value := range podIns.ObjectMeta.Finalizers {
+		if value == resources.FinalizersGreatDBCluster {
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		podIns.ObjectMeta.Finalizers = append(podIns.ObjectMeta.Finalizers, resources.FinalizersGreatDBCluster)
+		needUpdate = true
+	}
+
+	// update OwnerReferences
+	if podIns.ObjectMeta.OwnerReferences == nil {
+		podIns.ObjectMeta.OwnerReferences = make([]metav1.OwnerReference, 0, 1)
+	}
+	exist = false
+	for _, value := range podIns.ObjectMeta.OwnerReferences {
+		if value.UID == cluster.UID {
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
+		podIns.ObjectMeta.OwnerReferences = []metav1.OwnerReference{owner}
+		needUpdate = true
+	}
+
+	if needUpdate {
+
+	}
+
 	return nil
 
 }
 
-func (great GreatDBManager) updateLabels(cluster *v1alpha1.GreatDBPaxos, sts *appsv1.StatefulSet) (bool, string) {
+func (great GreatDBManager) updatePod(pod *corev1.Pod) error {
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := great.Client.KubeClientset.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
+
+		if err == nil {
+			return nil
+		}
+		upPod, err1 := great.Lister.PodLister.Pods(pod.Namespace).Get(pod.Name)
+		if err1 != nil {
+			dblog.Log.Reason(err).Errorf("failed to update pod %s/%s ", pod.Namespace, pod.Name)
+		} else {
+			if pod.ResourceVersion != upPod.ResourceVersion {
+				pod.ResourceVersion = upPod.ResourceVersion
+			}
+		}
+
+		return err
+	})
+	return err
+}
+
+func (great GreatDBManager) updateLabels(pod *corev1.Pod, cluster *v1alpha1.GreatDBPaxos) bool {
 	needUpdate := false
-	if sts.Labels == nil {
-		sts.Labels = make(map[string]string)
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
 	}
 	labels := resources.MegerLabels(cluster.Spec.Labels, great.GetLabels(cluster.Name))
 	for key, value := range labels {
-		if v, ok := sts.Labels[key]; !ok || v != value {
-			sts.Labels[key] = value
+		if v, ok := pod.Labels[key]; !ok || v != value {
+			pod.Labels[key] = value
 			needUpdate = true
 		}
 	}
-	patch := ""
-	if needUpdate {
-		data, _ := json.Marshal(sts.Labels)
-		patch = fmt.Sprintf(`{"op":"add","path":"/metadata/labels","value":%s}`, data)
-	}
 
-	return needUpdate, patch
+	return needUpdate
 }
 
-func (great GreatDBManager) updateAnnotations(cluster *v1alpha1.GreatDBPaxos, sts *appsv1.StatefulSet) (bool, string) {
+func (great GreatDBManager) updateAnnotations(pod *corev1.Pod, cluster *v1alpha1.GreatDBPaxos) bool {
 	needUpdate := false
-	if sts.Annotations == nil {
-		sts.Annotations = make(map[string]string)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
 	}
 	for key, value := range cluster.Spec.Annotations {
-		if v, ok := sts.Annotations[key]; !ok || v != value {
-			sts.Annotations[key] = value
+		if v, ok := pod.Annotations[key]; !ok || v != value {
+			pod.Annotations[key] = value
 			needUpdate = true
 		}
 	}
-	patch := ""
-	if needUpdate {
-		data, _ := json.Marshal(sts.Annotations)
-		patch = fmt.Sprintf(`{"op":"add","path":"/metadata/annotations","value":%s}`, data)
-	}
 
-	return needUpdate, patch
+	return needUpdate
 }
 
 func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
@@ -496,7 +558,7 @@ func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 			return err
 		}
 
-		serverList := []PaxosMember{}
+		serverList := []resources.PaxosMember{}
 		err = client.Query(QueryClusterMemberStatus, &serverList, []string{})
 		if err != nil {
 			dblog.Log.Reason(err).Error("failed to query member status")
@@ -688,6 +750,7 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			dblog.Log.Reason(err).Error("Failed to update greatdb instance status")
 		}
 	}
+	great.startGroupReplication(cluster)
 
 	var normalInsNum int32
 	var failureInsNum int32
@@ -785,22 +848,34 @@ func (great GreatDBManager) GetGreatDBHost(cluster *v1alpha1.GreatDBPaxos) []str
 
 }
 
-func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) ([]PaxosMember, error) {
+func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) ([]resources.PaxosMember, error) {
 
-	client, err := GetNormalMemberSqlClient(cluster)
-	if err != nil {
-		dblog.Log.Reason(err).Error("failed to Connect dbscale")
-		return nil, err
-	}
-	// Query real-time status from dbscale for updating
-	serverList := []PaxosMember{}
-	err = client.Query(QueryClusterMemberStatus, &serverList, []string{})
-	if err != nil {
-		dblog.Log.Reason(err)
-		return nil, err
-	}
+	ns := cluster.Namespace
+	clusterName := cluster.Name
+	clusterDomain := cluster.Spec.ClusterDomain
+	port := int(cluster.Spec.Port)
+	user, pwd := resources.GetClusterUser(cluster)
+	sqlClient := internal.NewDBClient()
+	for _, member := range cluster.Status.Member {
+		host := resources.GetInstanceFQDN(clusterName, member.Name, ns, clusterDomain)
+		err := sqlClient.Connect(user, pwd, host, port, "mysql")
+		if err != nil {
+			continue
+		}
+		memberList := make([]resources.PaxosMember, 0)
 
-	return serverList, nil
+		err = sqlClient.Query(QueryClusterMemberStatus, &memberList, []string{})
+		if err != nil {
+			log.Log.Reason(err).Errorf("failed to query cluster status")
+			return memberList, err
+		}
+		for _, status := range memberList {
+			if status.State == string(v1alpha1.MemberStatusOnline) {
+				return memberList, nil
+			}
+		}
+	}
+	return []resources.PaxosMember{}, nil
 }
 
 func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatDBPaxos) error {
@@ -864,6 +939,41 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 		cluster.Status.Member[i].LastUpdateTime = now
 		cluster.Status.Member[i].LastUpdateTime = now
 
+	}
+
+	return nil
+
+}
+
+func (great GreatDBManager) startGroupReplication(cluster *v1alpha1.GreatDBPaxos) error {
+
+	serverList, err := great.getDataServerList(cluster)
+	if err != nil {
+		return err
+	}
+	user, pwd := resources.GetClusterUser(cluster)
+	sql := fmt.Sprintf("start group_replication USER='%s',PASSWORD='%s';", user, pwd)
+	client := internal.NewDBClient()
+	port := int(cluster.Spec.Port)
+	if len(serverList) > 0 {
+		for _, member := range cluster.Status.Member {
+
+			if member.Type != v1alpha1.MemberStatusFree {
+				continue
+			}
+
+			host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+			err := client.Connect(user, pwd, host, port, "mysql")
+			if err != nil {
+				dblog.Log.Error(err.Error())
+				dblog.Log.Reason(err).Error("failed to exec sql")
+			}
+
+			err = client.Exec(sql)
+			if err != nil {
+				dblog.Log.Reason(err).Error("failed to exec sql")
+			}
+		}
 	}
 
 	return nil

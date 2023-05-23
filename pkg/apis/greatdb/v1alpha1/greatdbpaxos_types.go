@@ -289,7 +289,7 @@ type GreatDBPaxosStatus struct {
 
 	// Cluster boot was performed through that instance
 	// +optional
-	BootIns string `json:"bootIns,omitempty"`
+	BootIns string `json:"bootIns"`
 
 	// Current service state of GreatDBPaxos.
 	// +optional
@@ -297,7 +297,7 @@ type GreatDBPaxosStatus struct {
 
 	// Number of GreatDB component desired instances
 	// +optional
-	Instances int32 `json:"instances,omitempty"`
+	Instances int32 `json:"instances"`
 
 	// The actual number of target instances of greatdb
 	// +optional
@@ -345,7 +345,7 @@ type GreatDBPaxosStatus struct {
 // +kubebuilder:printcolumn:name="PORT",type="string",JSONPath=".status.port"
 // +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".status.version"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:resource:categories=all,path=greatdbpaxoses,scope=Namespaced,shortName=greatdb,singular=greatdbpaxos
+// +kubebuilder:resource:categories=all,path=greatdbpaxoses,scope=Namespaced,shortName=gdb,singular=greatdbpaxos
 
 // GreatDBPaxos is the Schema for the greatdbpaxos API
 type GreatDBPaxos struct {

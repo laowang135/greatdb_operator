@@ -3,8 +3,10 @@ package controllers
 import (
 	greatdbInformer "greatdb-operator/pkg/client/informers/externalversions"
 	deps "greatdb-operator/pkg/controllers/dependences"
+	readwriteseparation "greatdb-operator/pkg/controllers/read_write_separation"
 
 	"greatdb-operator/pkg/controllers/greatdbpaxos"
+
 	dblog "greatdb-operator/pkg/utils/log"
 
 	kubeinformer "k8s.io/client-go/informers"
@@ -66,13 +68,13 @@ func (ctrl Controllers) Run() {
 }
 
 func (ctrl Controllers) register() ControllerSet {
-	greatdbClusterController := greatdbpaxos.NewGreatDbClusterController(ctrl.client, ctrl.listers, ctrl.greatDBInformer, ctrl.kubeLabelInformerFactory)
+	greatdbClusterController := greatdbpaxos.NewGreatDBClusterController(ctrl.client, ctrl.listers, ctrl.greatDBInformer, ctrl.kubeLabelInformerFactory)
 
-	deps.NewCronRegistry(ctrl.client)
-
+	readAndWrite := readwriteseparation.NewReadAndWriteController(ctrl.client, ctrl.listers, ctrl.kubeLabelInformerFactory)
 	return ControllerSet{
 		// register  greatdb Cluster Controller
-		greatdbpaxos.ControllerName: &ControllerRun{worker: 1, ctrl: greatdbClusterController},
+		greatdbpaxos.ControllerName:        &ControllerRun{worker: 1, ctrl: greatdbClusterController},
+		readwriteseparation.ControllerName: &ControllerRun{worker: 3, ctrl: readAndWrite},
 	}
 
 }

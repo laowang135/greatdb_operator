@@ -41,6 +41,8 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 
 	now := metav1.Now()
 	if v, ok := mgr.Resources[key]; ok {
+
+		// Sync Interval
 		if now.Sub(v.LastSyncTime.Time) > time.Second*time.Duration(mgr.PeriodSeconds) {
 			v.LastSyncTime = now
 			v.FrequencyRecord = append(v.FrequencyRecord, now)
@@ -48,6 +50,7 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 			return true
 		}
 
+		// Number of synchronizations per minute
 		index := 0
 		for i, record := range v.FrequencyRecord {
 			if now.Sub(record.Time) > time.Minute {

@@ -86,6 +86,24 @@ const (
 	GreatDBPaxosUnknown GreatDBPaxosConditionType = "Unknown"
 )
 
+func (g GreatDBPaxosConditionType) Stage() int {
+	switch g {
+	case GreatDBPaxosPending, GreatDBPaxosPause:
+		return 0
+	case GreatDBPaxosDeployDB:
+		return 1
+	case GreatDBPaxosBootCluster:
+		return 2
+	case GreatDBPaxosInitUser:
+		return 3
+	case GreatDBPaxosSucceeded:
+		return 4
+	case GreatDBPaxosReady:
+		return 5
+	}
+	return 0
+}
+
 // Status of the greatdb instance
 type MemberConditionType string
 
