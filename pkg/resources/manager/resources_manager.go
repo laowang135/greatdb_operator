@@ -11,28 +11,40 @@ import (
 	"greatdb-operator/pkg/resources/service"
 
 	"greatdb-operator/pkg/resources/greatdbpaxos"
+	"greatdb-operator/pkg/resources/pods"
 
 	"k8s.io/client-go/tools/record"
 )
 
-type ResourceManagers struct {
+type GreatDBPaxosResourceManagers struct {
 	ConfigMap resources.Manager
 	Service   resources.Manager
 	Secret    resources.Manager
 	GreatDB   resources.Manager
 }
 
-func NewResourceManagers(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *ResourceManagers {
+func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *GreatDBPaxosResourceManagers {
 	configmap := &configmap.ConfigMapManager{Client: client, Listers: listers, Recorder: recorder}
 	service := &service.ServiceManager{Client: client, Listers: listers, Recorder: recorder}
 	secret := &secret.SecretManager{Client: client, Lister: listers, Recorder: recorder}
 
 	gdb := &greatdbpaxos.GreatDBManager{Client: client, Lister: listers, Recorder: recorder}
-	return &ResourceManagers{
+	return &GreatDBPaxosResourceManagers{
 		ConfigMap: configmap,
 		Service:   service,
 		Secret:    secret,
 		GreatDB:   gdb,
 	}
 
+}
+
+type ReadAndWriteManager struct {
+	Pods resources.Manager
+}
+
+func NewReadAndWriteManager(client *deps.ClientSet, listers *deps.Listers) *ReadAndWriteManager {
+	pod := pods.ReadAndWriteManager{Client: client, Lister: listers}
+	return &ReadAndWriteManager{
+		Pods: pod,
+	}
 }
