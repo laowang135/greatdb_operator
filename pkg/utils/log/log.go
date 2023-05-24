@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	libvirtTimestampFormat = "2006-01-02 15:04:05.999-0700"
-	logTimestampFormat     = "2006-01-02T15:04:05.000000Z"
+	logTimestampFormat = "2006-01-02T15:04:05.000000Z"
 )
 
 type LogLevel int32
@@ -186,7 +185,7 @@ func (l FilteredLogger) log(skipFrames int, params ...interface{}) error {
 	if l.currentLogLevel >= WARNING || (l.filterLevel == INFO &&
 		(l.currentLogLevel == l.filterLevel) &&
 		(l.currentVerbosityLevel <= l.verbosityLevel)) {
-		now := time.Now().UTC()
+		now := time.Now().Local()
 		_, fileName, lineNumber, _ := runtime.Caller(skipFrames)
 		logParams := make([]interface{}, 0, 8)
 

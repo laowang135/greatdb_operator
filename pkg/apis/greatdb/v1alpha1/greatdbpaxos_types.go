@@ -45,6 +45,8 @@ type ServiceType struct {
 }
 
 type PauseGreatDB struct {
+	// +optional
+	Enable bool `json:"enable,omitempty"`
 	// pause mode
 	// +kubebuilder:default="ins"
 	// +kubebuilder:validation:Enum="cluster";"ins"
@@ -56,6 +58,8 @@ type PauseGreatDB struct {
 }
 
 type RestartGreatDB struct {
+	// +optional
+	Enable bool `json:"enable,omitempty"`
 	// restart mode
 	// +kubebuilder:default="ins"
 	// +kubebuilder:validation:Enum="cluster";"ins"

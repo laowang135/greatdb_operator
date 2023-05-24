@@ -15,7 +15,6 @@ type DBClientinterface interface {
 	Connect(user, pass, host string, port int, dbname string) error
 	TranExec(string, ...interface{}) error
 	Exec(string, ...interface{}) error
-	UpdateRouterVariables([]DBVariable) error
 	UpdateDBVariables([]DBVariable) error
 	Query(query string, dest interface{}, fields []string) error
 	GetTableData(query string) ([]map[string]interface{}, error)
@@ -40,7 +39,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 	// connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?interpolateParams=true&timeout=5s",
 	// 	user, pass, host, port, dbname)
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true",
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true&timeout=5s",
 		user, pass, host, dbname)
 	db, err := sql.Open("mysql", connStr)
 	if err != nil {
@@ -97,11 +96,6 @@ func (client *defaultDBClient) Exec(query string, args ...interface{}) error {
 	}
 
 	return nil
-}
-
-func (client *defaultDBClient) UpdateRouterVariables(dbVariables []DBVariable) error {
-	query := "dbscale set global ?=?;"
-	return client.updateVariables(query, dbVariables)
 }
 
 func (client *defaultDBClient) UpdateDBVariables(dbVariables []DBVariable) error {

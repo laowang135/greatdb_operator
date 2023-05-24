@@ -15,7 +15,7 @@ spec:
     listKind: GreatDBPaxosList
     plural: greatdbpaxoses
     shortNames:
-    - greatdb
+    - gdb
     singular: greatdbpaxos
   scope: Namespaced
   versions:
@@ -939,6 +939,8 @@ spec:
               pause:
                 description: Configure GreatDB restart
                 properties:
+                  enable:
+                    type: boolean
                   instances:
                     description: The list of instances that need to be paused only
                       takes effect when mode=ins
@@ -1161,6 +1163,8 @@ spec:
               restart:
                 description: Configure GreatDB restart
                 properties:
+                  enable:
+                    type: boolean
                   instances:
                     description: The list of instances that need to be restat only
                       takes effect when mode=ins
@@ -1226,6 +1230,8 @@ spec:
                     password:
                       type: string
                     perm:
+                      type: string
+                    reason:
                       type: string
                   required:
                   - name
@@ -1544,10 +1550,22 @@ spec:
                     type: string
                 type: object
               users:
-                additionalProperties:
-                  type: string
                 description: User initialization result record
-                type: object
+                items:
+                  properties:
+                    name:
+                      type: string
+                    password:
+                      type: string
+                    perm:
+                      type: string
+                    reason:
+                      type: string
+                  required:
+                  - name
+                  - password
+                  type: object
+                type: array
               version:
                 description: version of cluster
                 type: string

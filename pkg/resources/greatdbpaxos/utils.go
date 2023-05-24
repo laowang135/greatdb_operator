@@ -174,3 +174,7 @@ func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClient
 	return nil, fmt.Errorf("no available connections")
 
 }
+
+func GetNowTime() string {
+	return time.Now().Local().Format("2006-01-02 15:04:05")
+}
