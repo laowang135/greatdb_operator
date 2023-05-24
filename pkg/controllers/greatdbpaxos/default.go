@@ -90,6 +90,14 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 		}
 	}
 
+	// restart
+	if cluster.Spec.Restart.Mode != v1alpha1.ClusterRestart {
+		cluster.Spec.Restart.Mode = v1alpha1.InsRestart
+	}
+	if cluster.Spec.Restart.Strategy != v1alpha1.AllRestart {
+		cluster.Spec.Restart.Strategy = v1alpha1.RollingRestart
+	}
+
 	if cluster.Spec.Instances < 3 {
 		update = true
 		cluster.Spec.Instances = 3

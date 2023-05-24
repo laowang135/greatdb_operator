@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -28,8 +27,8 @@ type QueueManager struct {
 }
 
 type Rescources struct {
-	LastSyncTime    metav1.Time
-	FrequencyRecord []metav1.Time
+	LastSyncTime    time.Time
+	FrequencyRecord []time.Time
 }
 
 func (mgr QueueManager) Add(key string, lock bool) bool {
@@ -39,11 +38,11 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 		defer mgr.RWLock.Unlock()
 	}
 
-	now := metav1.Now()
+	now := time.Now().Local()
 	if v, ok := mgr.Resources[key]; ok {
 
 		// Sync Interval
-		if now.Sub(v.LastSyncTime.Time) > time.Second*time.Duration(mgr.PeriodSeconds) {
+		if now.Sub(v.LastSyncTime) > time.Second*time.Duration(mgr.PeriodSeconds) {
 			v.LastSyncTime = now
 			v.FrequencyRecord = append(v.FrequencyRecord, now)
 			mgr.Resources[key] = v
@@ -53,15 +52,15 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 		// Number of synchronizations per minute
 		index := 0
 		for i, record := range v.FrequencyRecord {
-			if now.Sub(record.Time) > time.Minute {
+			if now.Sub(record) > time.Minute {
 				index = i
 			}
 		}
+		var res []time.Time
 		if index+1 < len(v.FrequencyRecord) {
-			index += 1
+			res = v.FrequencyRecord[index+1:]
 		}
 
-		res := v.FrequencyRecord[index:]
 		if len(res) < mgr.FrequencyMinute {
 			v.LastSyncTime = now
 			res = append(res, now)
@@ -69,12 +68,12 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 			mgr.Resources[key] = v
 			return true
 		}
-		mgr.Resources[key] = v
+
 		return false
 
 	}
 
-	record := make([]metav1.Time, 0, 10)
+	record := make([]time.Time, 0, 10)
 	record = append(record, now)
 	value := Rescources{
 		LastSyncTime:    now,

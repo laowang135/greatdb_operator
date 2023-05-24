@@ -117,7 +117,17 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		dblog.Log.Errorf("failed to sync greatDB pods of cluster %s/%s", ns, cluster.Name)
 		return err
 	}
+
 	newPod := pod.DeepCopy()
+
+	if err := great.restartGreatdb(cluster, newPod); err != nil {
+		return err
+	}
+
+	if _, ok := cluster.Status.RestartMember.Restarting[pod.Name]; ok {
+		return nil
+	}
+
 	if err = great.updateGreatDBPod(cluster, newPod); err != nil {
 		return err
 	}
@@ -169,6 +179,8 @@ func (great GreatDBManager) NewGreatDBPod(cluster *v1alpha1.GreatDBPaxos, member
 
 	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
 	labels := resources.MegerLabels(cluster.Spec.Labels, great.GetLabels(cluster.Name))
+	// TODO Debug
+	labels[resources.AppKubePodLabelKey] = member.Name
 	podSpec := great.GetPodSpec(cluster, member)
 	pod = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -775,7 +787,7 @@ func (great GreatDBManager) setmemberStatus(cluster *v1alpha1.GreatDBPaxos) {
 
 	for i, member := range cluster.Status.Member {
 
-		if member.Type != "" {
+		if member.Type != "" && member.Type != v1alpha1.MemberStatusUnknown {
 			continue
 		}
 
@@ -788,6 +800,9 @@ func (great GreatDBManager) setmemberStatus(cluster *v1alpha1.GreatDBPaxos) {
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
 				cluster.Status.Member[i].Type = v1alpha1.MemberStatusFree
+				if member.Address != "" {
+					break
+				}
 				svcName := cluster.Name + resources.ComponentGreatDBSuffix
 
 				cluster.Status.Member[i].Address = fmt.Sprintf("%s.%s.%s.svc.%s", member.Name, svcName, cluster.Namespace, cluster.Spec.ClusterDomain)
@@ -816,7 +831,7 @@ func (great GreatDBManager) GreatDBIsReady(cluster *v1alpha1.GreatDBPaxos) error
 		if member.Address != "" {
 			uri = member.Address
 		}
-
+		// TODO debug
 		uri = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
 
 		err := cli.Connect(user, password, uri, port, "mysql")
@@ -918,8 +933,12 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 
 		ok := false
 		if ins, ok = insStatusSet[member.Name]; !ok {
+			status := v1alpha1.MemberStatusUnknown
+			if member.Type == v1alpha1.MemberStatusFree {
+				status = v1alpha1.MemberStatusFree
+			}
 			ins = v1alpha1.MemberCondition{
-				Type: v1alpha1.MemberStatusFree,
+				Type: status,
 				Role: v1alpha1.MemberRoleUnknown,
 			}
 		}
@@ -966,7 +985,7 @@ func (great GreatDBManager) startGroupReplication(cluster *v1alpha1.GreatDBPaxos
 			err := client.Connect(user, pwd, host, port, "mysql")
 			if err != nil {
 				dblog.Log.Error(err.Error())
-				dblog.Log.Reason(err).Error("failed to exec sql")
+				return err
 			}
 
 			err = client.Exec(sql)
