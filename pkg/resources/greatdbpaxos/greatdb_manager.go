@@ -105,6 +105,15 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		return err
 	}
 
+	pause, err := great.pauseGreatdb(cluster, member)
+	if err != nil {
+		return err
+	}
+	// If the instance is paused, end processing
+	if pause {
+		return nil
+	}
+
 	pod, err := great.Lister.PodLister.Pods(ns).Get(member.Name)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -725,6 +734,33 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 	// set member status
 	great.setmemberStatus(cluster)
 
+	if cluster.Status.Phase.Stage() > 3 {
+		err := great.UpdateGreatDBInstanceStatus(cluster)
+		if err != nil {
+			dblog.Log.Reason(err).Error("Failed to update greatdb instance status")
+		}
+		great.startGroupReplication(cluster)
+	}
+
+	var normalInsNum int32
+	var failureInsNum int32
+	for _, member := range cluster.Status.Member {
+		switch member.Type {
+		case v1alpha1.MemberStatusError, v1alpha1.MemberStatusFailure, v1alpha1.MemberStatusOffline, v1alpha1.MemberStatusUnreachable:
+			failureInsNum += 1
+		case v1alpha1.MemberStatusOnline, v1alpha1.MemberStatusRecovering:
+			normalInsNum += 1
+		case v1alpha1.MemberStatusPause:
+			if member.Role != "" {
+				failureInsNum += 1
+			}
+		}
+	}
+
+	cluster.Status.ReadyInstances = normalInsNum
+	cluster.Status.AvailableReplicas = normalInsNum + failureInsNum
+	cluster.Status.Port = cluster.Spec.Port
+
 	switch cluster.Status.Phase {
 
 	case v1alpha1.GreatDBPaxosDeployDB:
@@ -753,31 +789,29 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 		}
 
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosSucceeded, "")
-	}
+	case v1alpha1.GreatDBPaxosReady:
+		// pause
+		if cluster.Spec.Pause.Enable && cluster.Spec.Pause.Mode == v1alpha1.ClusterPause {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosPause, "")
+			break
+		}
 
-	// Only update the greatdb instance when dbscale is running or restart
-	if cluster.Status.Status == v1alpha1.ClusterStatusRunning {
-		err := great.UpdateGreatDBInstanceStatus(cluster)
-		if err != nil {
-			dblog.Log.Reason(err).Error("Failed to update greatdb instance status")
+		if cluster.Spec.Restart.Enable {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRestart, "")
+			break
+		}
+	case v1alpha1.GreatDBPaxosPause:
+
+		if (cluster.Spec.Pause.Enable && cluster.Spec.Pause.Mode != v1alpha1.ClusterPause || !cluster.Spec.Pause.Enable) && cluster.Status.ReadyInstances > 0 {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
+		}
+
+	case v1alpha1.GreatDBPaxosRestart:
+
+		if !cluster.Spec.Restart.Enable && cluster.Status.ReadyInstances == cluster.Status.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
 	}
-	great.startGroupReplication(cluster)
-
-	var normalInsNum int32
-	var failureInsNum int32
-	for _, member := range cluster.Status.Member {
-		switch member.Type {
-		case v1alpha1.MemberStatusError, v1alpha1.MemberStatusFailure, v1alpha1.MemberStatusOffline, v1alpha1.MemberStatusUnreachable:
-			failureInsNum += 1
-		case v1alpha1.MemberStatusOnline, v1alpha1.MemberStatusRecovering:
-			normalInsNum += 1
-		}
-	}
-
-	cluster.Status.ReadyInstances = normalInsNum
-	cluster.Status.AvailableReplicas = normalInsNum + failureInsNum
-	cluster.Status.Port = cluster.Spec.Port
 
 	SetGreatDBclusterStatus(cluster)
 	return nil
@@ -863,7 +897,7 @@ func (great GreatDBManager) GetGreatDBHost(cluster *v1alpha1.GreatDBPaxos) []str
 
 }
 
-func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) ([]resources.PaxosMember, error) {
+func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) []resources.PaxosMember {
 
 	ns := cluster.Namespace
 	clusterName := cluster.Name
@@ -872,6 +906,9 @@ func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) ([
 	user, pwd := resources.GetClusterUser(cluster)
 	sqlClient := internal.NewDBClient()
 	for _, member := range cluster.Status.Member {
+		if member.Type == v1alpha1.MemberStatusPause {
+			continue
+		}
 		host := resources.GetInstanceFQDN(clusterName, member.Name, ns, clusterDomain)
 		err := sqlClient.Connect(user, pwd, host, port, "mysql")
 		if err != nil {
@@ -882,23 +919,20 @@ func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) ([
 		err = sqlClient.Query(QueryClusterMemberStatus, &memberList, []string{})
 		if err != nil {
 			log.Log.Reason(err).Errorf("failed to query cluster status")
-			return memberList, err
+			continue
 		}
 		for _, status := range memberList {
 			if status.State == string(v1alpha1.MemberStatusOnline) {
-				return memberList, nil
+				return memberList
 			}
 		}
 	}
-	return []resources.PaxosMember{}, nil
+	return []resources.PaxosMember{}
 }
 
 func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatDBPaxos) error {
 
-	serverList, err := great.getDataServerList(cluster)
-	if err != nil {
-		return err
-	}
+	serverList := great.getDataServerList(cluster)
 
 	now := metav1.Now()
 	insStatusSet := make(map[string]v1alpha1.MemberCondition)
@@ -927,10 +961,6 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 	var ins v1alpha1.MemberCondition
 	for i, member := range cluster.Status.Member {
 
-		if member.Type == v1alpha1.MemberStatusPause || member.Type == v1alpha1.MemberStatusRestart {
-			continue
-		}
-
 		ok := false
 		if ins, ok = insStatusSet[member.Name]; !ok {
 			status := v1alpha1.MemberStatusUnknown
@@ -941,6 +971,10 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 				Type: status,
 				Role: v1alpha1.MemberRoleUnknown,
 			}
+		}
+
+		if great.needPause(cluster, member) {
+			ins.Type = v1alpha1.MemberStatusPause
 		}
 
 		// Same status, only update time
@@ -966,10 +1000,8 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 
 func (great GreatDBManager) startGroupReplication(cluster *v1alpha1.GreatDBPaxos) error {
 
-	serverList, err := great.getDataServerList(cluster)
-	if err != nil {
-		return err
-	}
+	serverList := great.getDataServerList(cluster)
+
 	user, pwd := resources.GetClusterUser(cluster)
 	sql := fmt.Sprintf("start group_replication USER='%s',PASSWORD='%s';", user, pwd)
 	client := internal.NewDBClient()
