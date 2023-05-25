@@ -42,6 +42,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true&timeout=5s",
 		user, pass, host, dbname)
 	db, err := sql.Open("mysql", connStr)
+
 	if err != nil {
 		return fmt.Errorf("failed to connect to mysql: %s:%d, reason: %v", host, port, err)
 	}

@@ -116,6 +116,9 @@ func (great ReadAndWriteManager) GetMemberList(cluster *v1alpha1.GreatDBPaxos) (
 
 	sqlClient := internal.NewDBClient()
 	for _, member := range cluster.Status.Member {
+		if member.Type == v1alpha1.MemberStatusPause {
+			continue
+		}
 		host := resources.GetInstanceFQDN(clusterName, member.Name, ns, clusterDomain)
 		err := sqlClient.Connect(user, pwd, host, port, "mysql")
 		if err != nil {

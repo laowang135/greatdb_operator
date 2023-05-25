@@ -88,7 +88,7 @@ const (
 
 func (g GreatDBPaxosConditionType) Stage() int {
 	switch g {
-	case GreatDBPaxosPending, GreatDBPaxosPause:
+	case GreatDBPaxosPending:
 		return 0
 	case GreatDBPaxosDeployDB:
 		return 1
@@ -101,7 +101,7 @@ func (g GreatDBPaxosConditionType) Stage() int {
 	case GreatDBPaxosReady:
 		return 5
 	}
-	return 0
+	return 6
 }
 
 // Status of the greatdb instance
