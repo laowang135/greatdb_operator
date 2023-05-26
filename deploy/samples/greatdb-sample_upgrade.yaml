@@ -1,0 +1,7 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBPaxos
+metadata:
+  name: greatdb-sample
+spec:
+  image: mysql:v8.0.33-05261434
+  version: 8.0.33

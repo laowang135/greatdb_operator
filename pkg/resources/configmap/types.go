@@ -95,7 +95,7 @@ slave_preserve_commit_order = 1
 slave_rows_search_algorithms = INDEX_SCAN,HASH_SCAN
 slow_query_log = on
 sort_buffer_size = 2M
-tls-version=invalid
+tls-version=""
 sync_binlog = 1
 table_definition_cache = 5000
 table_open_cache = 5000
@@ -110,7 +110,7 @@ loose-plugin_load_add = 'mysql_clone.so'
 loose-plugin_load_add = 'group_replication.so'
 loose-group_replication_group_name = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
 
-loose-group_replication_ip_whitelist = ''
+loose-group_replication_ip_whitelist = '0.0.0.0/0'
 loose-group_replication_local_address = "GROUPLOCALADDRESS"
 loose-group_replication_group_seeds = ''
 

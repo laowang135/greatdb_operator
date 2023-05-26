@@ -12,14 +12,28 @@ type Manager interface {
 }
 
 type PaxosMember struct {
-	ChannelName string `json:CHANNEL_NAME,omitempty`
-	ID          string `json:MEMBER_ID,omitempty`
-	Host        string `json:MEMBER_HOST,omitempty`
-	Port        *int   `json:MEMBER_PORT,omitempty`
-	State       string `json:MEMBER_STATE,omitempty`
-	Role        string `json:MEMBER_ROLE,omitempty`
-	Version     string `jsob:MEMBER_VERSION,omitempty`
+	ChannelName string `json:"CHANNEL_NAME,omitempty"`
+	ID          string `json:"MEMBER_ID,omitempty"`
+	Host        string `json:"MEMBER_HOST,omitempty"`
+	Port        *int   `json:"MEMBER_PORT,omitempty"`
+	State       string `json:"MEMBER_STATE,omitempty"`
+	Role        string `json:"MEMBER_ROLE,omitempty"`
+	Version     string `json:"MEMBER_VERSION,omitempty"`
+	// MEMBER_COMMUNICATION_STACK 8.0.27
+	// Stack string `json:MEMBER_COMMUNICATION_STACK,omitempty`
+
 }
+
+// sql
+const (
+	// Query cluster status
+	QueryClusterMemberStatus = "select CHANNEL_NAME,MEMBER_ID,MEMBER_HOST,MEMBER_PORT,MEMBER_STATE,MEMBER_ROLE,MEMBER_VERSION from performance_schema.replication_group_members;"
+)
+
+var (
+	// QueryClusterMemberFields = []string{"CHANNEL_NAME", "MEMBER_ID", "MEMBER_HOST", "MEMBER_PORT", "MEMBER_STATE", "MEMBER_ROLE", "MEMBER_VERSION"}
+	QueryClusterMemberFields = []string{}
+)
 
 // label
 const (

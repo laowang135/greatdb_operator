@@ -178,5 +178,12 @@ func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClient
 }
 
 func GetNowTime() string {
+
 	return time.Now().Local().Format("2006-01-02 15:04:05")
+}
+
+func StringToTime(value string) time.Time {
+
+	n, _ := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
+	return n
 }

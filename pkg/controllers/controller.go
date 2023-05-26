@@ -73,7 +73,7 @@ func (ctrl Controllers) register() ControllerSet {
 	readAndWrite := readwriteseparation.NewReadAndWriteController(ctrl.client, ctrl.listers, ctrl.kubeLabelInformerFactory)
 	return ControllerSet{
 		// register  greatdb Cluster Controller
-		greatdbpaxos.ControllerName:        &ControllerRun{worker: 1, ctrl: greatdbClusterController},
+		greatdbpaxos.ControllerName:        &ControllerRun{worker: 3, ctrl: greatdbClusterController},
 		readwriteseparation.ControllerName: &ControllerRun{worker: 3, ctrl: readAndWrite},
 	}
 

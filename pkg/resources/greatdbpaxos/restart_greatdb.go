@@ -3,6 +3,7 @@ package greatdbpaxos
 import (
 	"context"
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
+	"time"
 
 	dblog "greatdb-operator/pkg/utils/log"
 
@@ -13,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (great GreatDBManager) restartGreatdb(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) (err error) {
+func (great GreatDBManager) restartGreatDB(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) (err error) {
 
 	if !podIns.DeletionTimestamp.IsZero() {
 		return nil
@@ -40,9 +41,14 @@ func (great GreatDBManager) restartGreatdb(cluster *v1alpha1.GreatDBPaxos, podIn
 
 func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {
 
-	if _, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
+	if value, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
+		// Restarting requires at least 30 seconds before continuing to determine
+		t := StringToTime(value)
+		if time.Now().Local().Sub(t) > time.Second*30 {
+			return nil
+		}
 		for _, member := range cluster.Status.Member {
-			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline {
+			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline && t.Sub(member.LastTransitionTime.Time) < 0 {
 				cluster.Status.RestartMember.Restarted[podIns.Name] = GetNowTime()
 				delete(cluster.Status.RestartMember.Restarting, podIns.Name)
 				break
@@ -103,9 +109,15 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 
 func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {
 
-	if _, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
+	if value, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
+		// Restarting requires at least 30 seconds before continuing to determine
+		t := StringToTime(value)
+
+		if time.Now().Local().Sub(t) > time.Second*30 {
+			return nil
+		}
 		for _, member := range cluster.Status.Member {
-			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline {
+			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline && t.Sub(member.LastTransitionTime.Time) < 0 {
 				cluster.Status.RestartMember.Restarted[podIns.Name] = GetNowTime()
 				delete(cluster.Status.RestartMember.Restarting, podIns.Name)
 				break
@@ -114,7 +126,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		return nil
 	}
 
-	if len(cluster.Status.Member) <= len(cluster.Status.RestartMember.Restarted) {
+	if great.restartClusterEnds(cluster) {
 		cluster.Status.RestartMember.Restarted = make(map[string]string, 0)
 		cluster.Status.RestartMember.Restarting = make(map[string]string, 0)
 		cluster.Spec.Restart.Enable = false
@@ -147,7 +159,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 
 func (great GreatDBManager) deletePod(ns, name string) error {
 	patch := `[{"op":"remove","path":"/metadata/finalizers"}]`
-	_, err := great.Client.KubeClientset.CoreV1().Pods(ns).Patch(
+	pods, err := great.Client.KubeClientset.CoreV1().Pods(ns).Patch(
 		context.TODO(), name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -155,6 +167,9 @@ func (great GreatDBManager) deletePod(ns, name string) error {
 		}
 		dblog.Log.Reason(err).Errorf("failed to delete finalizers of pods  %s/%s,", ns, name)
 		return err
+	}
+	if !pods.DeletionTimestamp.IsZero() {
+		return nil
 	}
 
 	err = great.Client.KubeClientset.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
@@ -168,4 +183,19 @@ func (great GreatDBManager) deletePod(ns, name string) error {
 
 	return nil
 
+}
+
+func (GreatDBManager) restartClusterEnds(cluster *v1alpha1.GreatDBPaxos) bool {
+	end := true
+	for _, member := range cluster.Status.Member {
+		if member.Type == v1alpha1.MemberStatusPause {
+			continue
+		}
+
+		if _, ok := cluster.Status.RestartMember.Restarted[member.Name]; !ok {
+			end = false
+		}
+	}
+
+	return end
 }
