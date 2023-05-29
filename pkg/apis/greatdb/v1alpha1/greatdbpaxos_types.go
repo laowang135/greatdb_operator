@@ -247,6 +247,9 @@ type MemberCondition struct {
 
 	// Instance Access Address
 	Address string `json:"address"`
+
+	// instance version
+	Version string `json:"version,omitempty"`
 }
 
 type UpgradeMember struct {

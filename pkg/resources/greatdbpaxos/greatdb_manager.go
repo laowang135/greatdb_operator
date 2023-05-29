@@ -105,7 +105,8 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		return err
 	}
 
-	pause, err := great.pauseGreatdb(cluster, member)
+	// pause
+	pause, err := great.pauseGreatDB(cluster, member)
 	if err != nil {
 		return err
 	}
@@ -114,6 +115,7 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		return nil
 	}
 
+	// create
 	pod, err := great.Lister.PodLister.Pods(ns).Get(member.Name)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -129,7 +131,8 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 
 	newPod := pod.DeepCopy()
 
-	if err := great.restartGreatdb(cluster, newPod); err != nil {
+	// restart
+	if err := great.restartGreatDB(cluster, newPod); err != nil {
 		return err
 	}
 
@@ -137,6 +140,17 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		return nil
 	}
 
+	// upgrade
+	err = great.upgradeGreatDB(cluster, newPod)
+	if err != nil {
+		return err
+	}
+
+	if _, ok := cluster.Status.UpgradeMember.Upgrading[pod.Name]; ok {
+		return nil
+	}
+
+	// update meta
 	if err = great.updateGreatDBPod(cluster, newPod); err != nil {
 		return err
 	}
@@ -498,6 +512,11 @@ func (great GreatDBManager) updateGreatDBPod(cluster *v1alpha1.GreatDBPaxos, pod
 
 	if needUpdate {
 
+		err := great.updatePod(podIns)
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
@@ -507,8 +526,7 @@ func (great GreatDBManager) updateGreatDBPod(cluster *v1alpha1.GreatDBPaxos, pod
 func (great GreatDBManager) updatePod(pod *corev1.Pod) error {
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, err := great.Client.KubeClientset.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
-
+		_, err := great.Client.KubeClientset.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err == nil {
 			return nil
 		}
@@ -580,7 +598,7 @@ func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 		}
 
 		serverList := []resources.PaxosMember{}
-		err = client.Query(QueryClusterMemberStatus, &serverList, []string{})
+		err = client.Query(resources.QueryClusterMemberStatus, &serverList, resources.QueryClusterMemberFields)
 		if err != nil {
 			dblog.Log.Reason(err).Error("failed to query member status")
 			return err
@@ -916,7 +934,7 @@ func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) []
 		}
 		memberList := make([]resources.PaxosMember, 0)
 
-		err = sqlClient.Query(QueryClusterMemberStatus, &memberList, []string{})
+		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
 		if err != nil {
 			log.Log.Reason(err).Errorf("failed to query cluster status")
 			continue
@@ -946,9 +964,10 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 		}
 
 		insStatusSet[name] = v1alpha1.MemberCondition{
-			Name: name,
-			Type: v1alpha1.MemberConditionType(ser.State).Parse(),
-			Role: v1alpha1.MemberRoleType(ser.Role).Parse(),
+			Name:    name,
+			Type:    v1alpha1.MemberConditionType(ser.State).Parse(),
+			Role:    v1alpha1.MemberRoleType(ser.Role).Parse(),
+			Version: ser.Version,
 		}
 		// set version
 		cluster.Status.Version = ser.Version
@@ -991,6 +1010,7 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 		cluster.Status.Member[i].Role = ins.Role
 		cluster.Status.Member[i].LastUpdateTime = now
 		cluster.Status.Member[i].LastUpdateTime = now
+		cluster.Status.Member[i].Version = ins.Version
 
 	}
 

@@ -126,7 +126,7 @@ func (great ReadAndWriteManager) GetMemberList(cluster *v1alpha1.GreatDBPaxos) (
 		}
 		memberList := make([]resources.PaxosMember, 0)
 
-		err = sqlClient.Query(QueryClusterMemberStatus, &memberList, []string{})
+		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
 		if err != nil {
 			log.Log.Reason(err).Errorf("failed to query cluster status")
 			return memberList, err

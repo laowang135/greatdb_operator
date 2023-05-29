@@ -39,14 +39,14 @@ init_config() {
             server_id=$(cat /greatdb/mysql/conf/server_id)
             if [ -z "$server_id" ]; then
                 server_id=$(date '+%s')
-                host_id=$(cat /proc/sys/kernel/hostname | awk -F - '{ print $NF}' | grep -o '[0-9]\+' | tr '\n' '\0' || '')
+                host_id=$(cat /proc/sys/kernel/hostname | awk -F - '{ print $NF}' | grep -o '[0-9]\+' | tr '\n' '\0' )
                 server_id=$server_id$host_id
                 server_id=${server_id: -6}
                 echo $server_id >/greatdb/mysql/conf/server_id
             fi
         else
             server_id=$(date '+%s')
-            host_id=$(cat /proc/sys/kernel/hostname | awk -F - '{ print $NF}' | grep -o '[0-9]\+' | tr '\n' '\0' || '')
+            host_id=$(cat /proc/sys/kernel/hostname | awk -F - '{ print $NF}' | grep -o '[0-9]\+' | tr '\n' '\0' )
             server_id=$server_id$host_id
             server_id=${server_id: -6}
             echo $server_id >/greatdb/mysql/conf/server_id
@@ -160,9 +160,6 @@ EOSQL
 }
 
 init_gtid_sql() {
-    if [ "$IS_FROM_BACKUP" != "true" ]; then
-        return
-    fi
 
     until [ -S "/greatdb/mysql/socket/mysql.sock" ]; do
         echo "Wait for MySQL to be ready"
@@ -207,6 +204,26 @@ EOSQL
 
 }
 
+init_sql(){
+     if [ "$IS_FROM_BACKUP" == "true" ]; then
+
+        init_gtid_sql
+        if [ "$?" != "0" ]; then
+            echo "Failed to start the database"
+            exit 1
+        fi
+        return
+    fi
+
+   
+    init_user_sql
+    if [ "$?" != "0" ]; then
+            echo "Failed to start the database"
+            exit 1
+    fi
+
+}
+
 start_mysql() {
     echo "start "
     $mysql_server --defaults-file=/greatdb/mysql/conf/my.cnf &
@@ -221,13 +238,19 @@ _main() {
     fi
     rm -rf /greatdb/mysql/socket/mysql.sock
     start_mysql
-    init_gtid_sql
     if [ "$?" != "0" ]; then
         echo "Failed to start the database"
         exit 1
     fi
-    init_user_sql
-     echo "start  Successfully"
+
+    init_sql
+    if [ "$?" != "0" ]; then
+        echo "Failed to exec init sql "
+        exit 1
+    fi
+
+    echo "start  Successfully"
+   
 }
 
 _main

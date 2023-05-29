@@ -360,17 +360,17 @@ func (greatdb greatdbConfigManager) initParams(config *internalConfig.IniParser,
 	groupSeed := ""
 
 	hosts := greatdb.getGreatdbServiceClientUri(cluster)
-	whitelist := ""
+	// whitelist := ""
 	for _, host := range hosts {
 		groupSeed += fmt.Sprintf("%s:%d,", host, resources.GroupPort)
-		whitelist += host + ","
+		// whitelist += host + ","
 	}
 
 	groupSeed = strings.TrimSuffix(groupSeed, ",")
-	whitelist = strings.TrimSuffix(whitelist, ",")
+	// whitelist = strings.TrimSuffix(whitelist, ",")
 
 	// loose-group_replication_group_seeds
-	config.SetValue("mysqld", "loose-group_replication_ip_whitelist", whitelist)
+	// config.SetValue("mysqld", "loose-group_replication_ip_whitelist", whitelist)
 	config.SetValue("mysqld", "loose-group_replication_group_seeds", groupSeed)
 
 	// port

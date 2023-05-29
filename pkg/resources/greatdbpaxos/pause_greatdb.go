@@ -7,7 +7,7 @@ import (
 )
 
 // pauseGreatdb Whether to pause the return instance
-func (great GreatDBManager) pauseGreatdb(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (bool, error) {
+func (great GreatDBManager) pauseGreatDB(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (bool, error) {
 
 	if !great.needPause(cluster, member) {
 		return false, nil
@@ -57,4 +57,17 @@ func (GreatDBManager) needPause(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.
 
 	}
 	return false
+}
+
+func (GreatDBManager) GetRunningMember(cluster *v1alpha1.GreatDBPaxos) int {
+
+	num := 0
+	for _, member := range cluster.Status.Member {
+		if member.Type == v1alpha1.MemberStatusPause {
+			continue
+		}
+		num++
+	}
+
+	return num
 }
