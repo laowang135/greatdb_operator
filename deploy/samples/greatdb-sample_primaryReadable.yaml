@@ -1,0 +1,8 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBPaxos
+metadata:
+  name: greatdb-sample
+spec:
+  image: greatdb:v8.0.26-05171716
+  version: 8.0.26
+  primaryReadable: true

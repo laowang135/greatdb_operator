@@ -191,6 +191,9 @@ type GreatDBPaxosSpec struct {
 	// Labels for the component.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// Set whether the main node is readable
+	PrimaryReadable bool `json:"primaryReadable,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.

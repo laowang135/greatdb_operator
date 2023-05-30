@@ -892,6 +892,20 @@ spec:
                   type: string
                 description: Customized configuration parameters for database components
                 type: object
+              delete:
+                description: Configure GreatDB restart
+                properties:
+                  cleanPvc:
+                    description: Do you want to synchronize the cleaning of the corresponding
+                      PVC
+                    type: boolean
+                  instances:
+                    description: Configure the list of instances that need to be deleted,If
+                      the instance does not exist, it will be skipped
+                    items:
+                      type: string
+                    type: array
+                type: object
               image:
                 description: image used by the GreatDBPaxos
                 type: string
@@ -912,12 +926,6 @@ spec:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
-                type: array
-              instanceDelete:
-                description: Configure the list of instances that need to be deleted,If
-                  the instance does not exist, it will be skipped
-                items:
-                  type: string
                 type: array
               instances:
                 default: 3
@@ -1123,6 +1131,9 @@ spec:
                 description: Specify the port on which the service runs
                 format: int32
                 type: integer
+              primaryReadable:
+                description: Set whether the main node is readable
+                type: boolean
               priorityClassName:
                 description: Set the binding priority name for cluster scheduling
                 type: string
@@ -1490,6 +1501,9 @@ spec:
                       type: string
                     type:
                       description: Type is the type of the condition.
+                      type: string
+                    version:
+                      description: instance version
                       type: string
                   required:
                   - address

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -109,7 +110,7 @@ func (svc ServiceManager) createGreatDBReadOrWriteService(cluster *v1alpha1.Grea
 		serviceName = cluster.Name + resources.ServiceWrite
 	}
 
-	labels := svc.getGreatDBServiceLabels(cluster.Name, greatdbSvcType)
+	labels := svc.getGreatDBServiceLabels(cluster, greatdbSvcType)
 	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
 	service := svc.NewGreatDBReadOrWriteService(serviceName, labels, owner, cluster, greatdbSvcType)
 	_, err := svc.Client.KubeClientset.CoreV1().Services(cluster.Namespace).Create(context.TODO(), service, metav1.CreateOptions{})
@@ -186,22 +187,24 @@ func (svc ServiceManager) NewGreatDBReadOrWriteService(servicename string, label
 }
 
 // getGreatDBServiceLabels Returns the label of the GreatDB service
-func (svc ServiceManager) getGreatDBServiceLabels(clusterName string, svcType GreatDBServiceType) map[string]string {
+func (svc ServiceManager) getGreatDBServiceLabels(cluster *v1alpha1.GreatDBPaxos, svcType GreatDBServiceType) map[string]string {
 
 	labels := make(map[string]string)
 	labels[resources.AppKubeNameLabelKey] = resources.AppKubeNameLabelValue
-	labels[resources.AppKubeInstanceLabelKey] = clusterName
+	labels[resources.AppKubeInstanceLabelKey] = cluster.Name
 	labels[resources.AppkubeManagedByLabelKey] = resources.AppkubeManagedByLabelValue
 
 	switch svcType {
 	case GreatDBServiceRead:
-		labels[resources.AppKubeGreatDBRoleLabelKey] = string(v1alpha1.MemberRoleSecondary)
+		if !cluster.Spec.PrimaryReadable {
+			labels[resources.AppKubeGreatDBRoleLabelKey] = string(v1alpha1.MemberRoleSecondary)
+		}
 
 	case GreatDBServiceWrite:
 		labels[resources.AppKubeGreatDBRoleLabelKey] = string(v1alpha1.MemberRolePrimary)
 		// case GreatDBServiceHeadless:
-
 	}
+
 	return labels
 }
 
@@ -229,7 +232,7 @@ func (svc ServiceManager) updateGreatDBReadOrWriteService(service *corev1.Servic
 		needUpdate = true
 	}
 	// Prevent labels from being deleted by mistake
-	labels := svc.getGreatDBServiceLabels(cluster.Name, greatdbSvcType)
+	labels := svc.getGreatDBServiceLabels(cluster, greatdbSvcType)
 	if svc.updateServiceLabel(service, labels) {
 		needUpdate = true
 	}
@@ -292,7 +295,7 @@ func (svc ServiceManager) updateGreatDBReadOrWriteService(service *corev1.Servic
 // SyncGreatDBHeadlessService Synchronize the headless services of dbscale
 func (svc *ServiceManager) SyncGreatDBHeadlessService(cluster *v1alpha1.GreatDBPaxos) error {
 
-	ns, clusterName := cluster.Namespace, cluster.Name
+	ns := cluster.Namespace
 	serviceName := cluster.GetName() + resources.ComponentGreatDBSuffix
 
 	service, err := svc.Listers.ServiceLister.Services(ns).Get(serviceName)
@@ -302,7 +305,7 @@ func (svc *ServiceManager) SyncGreatDBHeadlessService(cluster *v1alpha1.GreatDBP
 			if !cluster.DeletionTimestamp.IsZero() {
 				return nil
 			}
-			if err := svc.createGreatDBHeadlessService(ns, clusterName, serviceName, cluster.Spec.Port, cluster.UID); err != nil {
+			if err := svc.createGreatDBHeadlessService(cluster, serviceName); err != nil {
 				return err
 			}
 			return nil
@@ -319,13 +322,13 @@ func (svc *ServiceManager) SyncGreatDBHeadlessService(cluster *v1alpha1.GreatDBP
 	return nil
 }
 
-func (svc ServiceManager) createGreatDBHeadlessService(ns, clusterName, serviceName string, port int32, clusterUID types.UID) error {
+func (svc ServiceManager) createGreatDBHeadlessService(cluster *v1alpha1.GreatDBPaxos, serviceName string) error {
 
-	labels := svc.getGreatDBServiceLabels(clusterName, GreatDBServiceHeadless)
-	owner := resources.GetGreatDBClusterOwnerReferences(clusterName, clusterUID)
-	service := svc.NewGreatDBHeadlessService(serviceName, ns, port, labels, owner)
+	labels := svc.getGreatDBServiceLabels(cluster, GreatDBServiceHeadless)
+	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
+	service := svc.NewGreatDBHeadlessService(serviceName, cluster.Namespace, cluster.Spec.Port, labels, owner)
 
-	_, err := svc.Client.KubeClientset.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
+	_, err := svc.Client.KubeClientset.CoreV1().Services(cluster.Namespace).Create(context.TODO(), service, metav1.CreateOptions{})
 
 	if err != nil {
 		// If the service already exists, try to update it
@@ -333,7 +336,7 @@ func (svc ServiceManager) createGreatDBHeadlessService(ns, clusterName, serviceN
 
 			labelsData, _ := json.Marshal(labels)
 			data := fmt.Sprintf(`{"metadata":{"labels":%s}}`, labelsData)
-			if err = svc.PatchService(ns, serviceName, data); err != nil {
+			if err = svc.PatchService(cluster.Namespace, serviceName, data); err != nil {
 				return err
 			}
 			return nil
@@ -374,7 +377,7 @@ func (svc ServiceManager) updateGreatDBHeadlessService(service *corev1.Service, 
 		needUpdate = true
 	}
 	// Prevent labels from being deleted by mistake
-	labels := svc.getGreatDBServiceLabels(cluster.Name, GreatDBServiceHeadless)
+	labels := svc.getGreatDBServiceLabels(cluster, GreatDBServiceHeadless)
 	if svc.updateServiceLabel(service, labels) {
 		needUpdate = true
 	}
@@ -450,15 +453,9 @@ func (svc ServiceManager) updateServiceLabel(service *corev1.Service, labels map
 func (svc ServiceManager) updateServiceSelector(service *corev1.Service, labels map[string]string) bool {
 	needUpdate := false
 
-	if service.Spec.Selector == nil {
-		service.Spec.Selector = make(map[string]string)
-	}
-
-	for key, value := range labels {
-		if v, ok := service.Spec.Selector[key]; !ok || v != value {
-			service.Spec.Selector[key] = value
-			needUpdate = true
-		}
+	if !reflect.DeepEqual(service.Spec.Selector, labels) {
+		service.Spec.Selector = labels
+		needUpdate = true
 	}
 
 	return needUpdate

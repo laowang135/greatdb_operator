@@ -5,7 +5,7 @@ metadata:
 spec:
   image: greatdb:v8.0.26-05171716
   version: 8.0.26
-
-  instanceDelete:
-  - greatdb-sample-greatdb-1
+  delete:
+    instances:
+    - greatdb-sample-greatdb-1
 
