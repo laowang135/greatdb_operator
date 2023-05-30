@@ -70,7 +70,8 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
 done
 
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
-  echo "Generating deepcopy funcs"
+  echo "Generating deepcopy funcs input: "$(codegen::join , "${FQ_APIS[@]}")" "
+  
   "${gobin}/deepcopy-gen" --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" -O zz_generated.deepcopy "$@"
 fi
 

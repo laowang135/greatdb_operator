@@ -9,6 +9,10 @@ import (
 // pauseGreatdb Whether to pause the return instance
 func (great GreatDBManager) pauseGreatDB(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (bool, error) {
 
+	if cluster.Spec.Pause == nil {
+		cluster.Spec.Pause = &v1alpha1.PauseGreatDB{}
+	}
+
 	if !great.needPause(cluster, member) {
 		return false, nil
 	}
