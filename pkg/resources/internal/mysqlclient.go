@@ -230,11 +230,6 @@ func (client *defaultDBClient) GetTableData(query string) ([]map[string]interfac
 		}
 		tableData = append(tableData, entry)
 	}
-	// jsonData, err := json.Marshal(tableData)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(string(jsonData))
 	return tableData, nil
 
 }

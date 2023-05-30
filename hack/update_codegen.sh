@@ -36,7 +36,7 @@ bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy" \
     ${MODULE}/pkg/client ${MODULE}/pkg/apis \
     ${GROUPVERSION} \
     --output-base "${SCRIPT_ROOT}/../" \
-    --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt -v=5
+    --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt -v=3
 
 #####################样例 start##################################
 # bash ./hack/update_codegen.sh  greatdb-operator greatdb:v1alpha1

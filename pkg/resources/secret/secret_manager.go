@@ -302,7 +302,6 @@ func (ret SecretManager) UpdateLabel(clusterName string, secret *corev1.Secret) 
 func (ret SecretManager) UpdateClusterSecretName(ns, clustername, secretName string) error {
 
 	patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/secretName","value":"%s"}]`, secretName)
-	fmt.Println(patch)
 
 	_, err := ret.Client.Clientset.GreatdbV1alpha1().GreatDBPaxoses(ns).Patch(context.Background(), clustername, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 	if err != nil {

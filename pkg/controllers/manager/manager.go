@@ -43,8 +43,14 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 
 		// Sync Interval
 		if now.Sub(v.LastSyncTime) > time.Second*time.Duration(mgr.PeriodSeconds) {
+
 			v.LastSyncTime = now
+
+			if len(v.FrequencyRecord) > mgr.FrequencyMinute {
+				v.FrequencyRecord = v.FrequencyRecord[len(v.FrequencyRecord)-mgr.FrequencyMinute:]
+			}
 			v.FrequencyRecord = append(v.FrequencyRecord, now)
+
 			mgr.Resources[key] = v
 			return true
 		}
@@ -107,14 +113,16 @@ func (mgr QueueManager) EndOfProcessing(key string) {
 	mgr.ProcessingResources.Delete(key)
 }
 
-func (mgr QueueManager) Watch(queue workqueue.RateLimitingInterface) {
+func (mgr QueueManager) Watch(queue workqueue.RateLimitingInterface) []string {
 
 	mgr.RWLock.Lock()
 	defer mgr.RWLock.Unlock()
+	keyList := make([]string, 0)
 	for key := range mgr.Resources {
 		if mgr.Add(key, false) {
 			queue.Add(key)
+			keyList = append(keyList, key)
 		}
 	}
-
+	return keyList
 }

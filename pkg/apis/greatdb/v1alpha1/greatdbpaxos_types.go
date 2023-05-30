@@ -75,6 +75,16 @@ type RestartGreatDB struct {
 	Strategy RestartStrategyType `json:"strategy,omitempty"`
 }
 
+type DeleteInstance struct {
+	// Configure the list of instances that need to be deleted,If the instance does not exist, it will be skipped
+	// +optional
+	Instances []string `json:"instances,omitempty"`
+
+	// Do you want to synchronize the cleaning of the corresponding PVC
+	// +optional
+	CleanPvc bool `json:"cleanPvc,omitempty"`
+}
+
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
 type GreatDBPaxosSpec struct {
 	// set cluster affinity
@@ -84,7 +94,7 @@ type GreatDBPaxosSpec struct {
 	// PvReclaimPolicy Corresponding to pv.spec.persistentVolumeReclaimPolicy
 	// +kubebuilder:default="Retain"
 	// +kubebuilder:validation:Enum="Delete";"Retain"
-	PvReclaimPolicy string `json:"pvReclaimPolicy,omitempty"`
+	PvReclaimPolicy v1.PersistentVolumeReclaimPolicy `json:"pvReclaimPolicy,omitempty"`
 
 	//  Corresponding to pv.spec.securityContext
 	// +optional
@@ -165,15 +175,14 @@ type GreatDBPaxosSpec struct {
 
 	// Configure GreatDB restart
 	// +optional
-	Pause PauseGreatDB `json:"pause,omitempty"`
+	Pause *PauseGreatDB `json:"pause,omitempty"`
 
 	// Configure GreatDB restart
 	// +optional
-	Restart RestartGreatDB `json:"restart,omitempty"`
+	Restart *RestartGreatDB `json:"restart,omitempty"`
 
-	// Configure the list of instances that need to be deleted,If the instance does not exist, it will be skipped
-	// +optional
-	InstanceDelete []string `json:"instanceDelete,omitempty"`
+	// Configure GreatDB restart
+	Delete *DeleteInstance `json:"delete,omitempty"`
 
 	// Annotations for the component.
 	// +optional
@@ -339,8 +348,8 @@ type GreatDBPaxosStatus struct {
 	Users []User `json:"users,omitempty"`
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +genclient
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

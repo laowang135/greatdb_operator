@@ -16,8 +16,8 @@ import (
 
 func (great GreatDBManager) restartGreatDB(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) (err error) {
 
-	if !podIns.DeletionTimestamp.IsZero() {
-		return nil
+	if cluster.Spec.Restart == nil {
+		cluster.Spec.Restart = &v1alpha1.RestartGreatDB{}
 	}
 
 	if cluster.Status.RestartMember.Restarting == nil {
@@ -44,7 +44,7 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 	if value, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
 		// Restarting requires at least 30 seconds before continuing to determine
 		t := StringToTime(value)
-		if time.Now().Local().Sub(t) > time.Second*30 {
+		if time.Now().Local().Sub(t) < time.Second*30 {
 			return nil
 		}
 		for _, member := range cluster.Status.Member {
@@ -82,6 +82,10 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 	if _, ok := cluster.Status.RestartMember.Restarted[podIns.Name]; ok {
 		return nil
 	}
+	if !podIns.DeletionTimestamp.IsZero() {
+		cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
+		return nil
+	}
 
 	// Restart according to strategy
 	switch cluster.Spec.Restart.Strategy {
@@ -113,7 +117,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		// Restarting requires at least 30 seconds before continuing to determine
 		t := StringToTime(value)
 
-		if time.Now().Local().Sub(t) > time.Second*30 {
+		if time.Now().Local().Sub(t) < time.Second*30 {
 			return nil
 		}
 		for _, member := range cluster.Status.Member {
@@ -130,6 +134,11 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		cluster.Status.RestartMember.Restarted = make(map[string]string, 0)
 		cluster.Status.RestartMember.Restarting = make(map[string]string, 0)
 		cluster.Spec.Restart.Enable = false
+		return nil
+	}
+
+	if !podIns.DeletionTimestamp.IsZero() {
+		cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
 		return nil
 	}
 

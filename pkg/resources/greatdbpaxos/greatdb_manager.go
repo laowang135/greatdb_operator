@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"greatdb-operator/pkg/config"
 
@@ -12,7 +13,6 @@ import (
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/resources/internal"
-	"greatdb-operator/pkg/utils/log"
 	dblog "greatdb-operator/pkg/utils/log"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,7 +83,6 @@ func (great GreatDBManager) UpdateTargetInstanceToMember(cluster *v1alpha1.Great
 
 	}
 
-	return
 }
 
 func (great GreatDBManager) CreateOrUpdateGreatDB(cluster *v1alpha1.GreatDBPaxos) error {
@@ -105,13 +104,25 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 		return err
 	}
 
-	// pause
-	pause, err := great.pauseGreatDB(cluster, member)
+	if cluster.DeletionTimestamp.IsZero() {
+
+		// pause
+		pause, err := great.pauseGreatDB(cluster, member)
+		if err != nil {
+			return err
+		}
+		// If the instance is paused, end processing
+		if pause {
+			return nil
+		}
+	}
+
+	del, err := great.deleteGreatDB(cluster, member)
 	if err != nil {
 		return err
 	}
-	// If the instance is paused, end processing
-	if pause {
+
+	if del {
 		return nil
 	}
 
@@ -131,23 +142,26 @@ func (great GreatDBManager) CreateOrUpdateInstance(cluster *v1alpha1.GreatDBPaxo
 
 	newPod := pod.DeepCopy()
 
-	// restart
-	if err := great.restartGreatDB(cluster, newPod); err != nil {
-		return err
-	}
+	if cluster.DeletionTimestamp.IsZero() {
+		// restart
+		if err := great.restartGreatDB(cluster, newPod); err != nil {
+			return err
+		}
 
-	if _, ok := cluster.Status.RestartMember.Restarting[pod.Name]; ok {
-		return nil
-	}
+		if _, ok := cluster.Status.RestartMember.Restarting[pod.Name]; ok {
+			return nil
+		}
 
-	// upgrade
-	err = great.upgradeGreatDB(cluster, newPod)
-	if err != nil {
-		return err
-	}
+		// upgrade
+		err = great.upgradeGreatDB(cluster, newPod)
+		if err != nil {
+			return err
+		}
 
-	if _, ok := cluster.Status.UpgradeMember.Upgrading[pod.Name]; ok {
-		return nil
+		if _, ok := cluster.Status.UpgradeMember.Upgrading[pod.Name]; ok {
+			return nil
+		}
+
 	}
 
 	// update meta
@@ -258,21 +272,6 @@ func (great GreatDBManager) GetPodSpec(cluster *v1alpha1.GreatDBPaxos, member v1
 	}
 
 	return
-
-}
-
-func (great GreatDBManager) getVolumeClaimTemplates(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (pvc corev1.PersistentVolumeClaim) {
-
-	return corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        member.PvcName,
-			Namespace:   cluster.Namespace,
-			Labels:      great.GetLabels(cluster.Name),
-			Finalizers:  []string{resources.FinalizersGreatDBCluster},
-			Annotations: cluster.Spec.Annotations,
-		},
-		Spec: cluster.Spec.VolumeClaimTemplates,
-	}
 
 }
 
@@ -936,7 +935,7 @@ func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) []
 
 		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
 		if err != nil {
-			log.Log.Reason(err).Errorf("failed to query cluster status")
+			dblog.Log.Reason(err).Errorf("failed to query cluster status")
 			continue
 		}
 		for _, status := range memberList {
@@ -998,7 +997,10 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 
 		// Same status, only update time
 		if cluster.Status.Member[i].Type == ins.Type && cluster.Status.Member[i].Role == ins.Role {
-			cluster.Status.Conditions[i].LastUpdateTime = now
+			if now.Sub(cluster.Status.Member[i].LastUpdateTime.Time) > time.Second*20 {
+				cluster.Status.Member[i].LastUpdateTime = now
+			}
+
 			continue
 		}
 
@@ -1009,7 +1011,7 @@ func (great GreatDBManager) UpdateGreatDBInstanceStatus(cluster *v1alpha1.GreatD
 		cluster.Status.Member[i].Type = ins.Type
 		cluster.Status.Member[i].Role = ins.Role
 		cluster.Status.Member[i].LastUpdateTime = now
-		cluster.Status.Member[i].LastUpdateTime = now
+		cluster.Status.Member[i].LastTransitionTime = now
 		cluster.Status.Member[i].Version = ins.Version
 
 	}
@@ -1040,6 +1042,10 @@ func (great GreatDBManager) startGroupReplication(cluster *v1alpha1.GreatDBPaxos
 				return err
 			}
 
+			err = client.Exec("stop group_replication;")
+			if err != nil {
+				dblog.Log.Reason(err).Error("failed to exec sql")
+			}
 			err = client.Exec(sql)
 			if err != nil {
 				dblog.Log.Reason(err).Error("failed to exec sql")

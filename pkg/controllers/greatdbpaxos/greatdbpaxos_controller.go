@@ -131,7 +131,7 @@ func (ctrl *GreatDBClusterController) Run(threading int, stopCh <-chan struct{})
 
 	dblog.Log.V(2).Info("Starting workers")
 	for i := 0; i < threading; i++ {
-		go wait.Until(ctrl.runWorker, time.Minute*2, stopCh)
+		go wait.Until(ctrl.runWorker, time.Second*30, stopCh)
 	}
 
 	go wait.Until(ctrl.localWatch, time.Second*time.Duration(ctrl.queueMgr.PeriodSeconds), stopCh)
@@ -484,5 +484,6 @@ func (ctrl *GreatDBClusterController) enqueuePodFn(obj interface{}) {
 
 func (ctrl *GreatDBClusterController) localWatch() {
 
-	ctrl.queueMgr.Watch(ctrl.Queue)
+	res := ctrl.queueMgr.Watch(ctrl.Queue)
+	dblog.Log.Infof("Timing synchronization of greatdb cluster: %v", res)
 }

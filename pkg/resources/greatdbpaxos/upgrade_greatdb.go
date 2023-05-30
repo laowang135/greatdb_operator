@@ -43,7 +43,7 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 	if value, ok := cluster.Status.UpgradeMember.Upgrading[podIns.Name]; ok {
 		// Upgrading requires at least 30 seconds before continuing to determine
 		t := StringToTime(value)
-		if time.Now().Local().Sub(t) > time.Second*30 {
+		if time.Now().Local().Sub(t) < time.Second*30 {
 			return nil
 		}
 
