@@ -315,10 +315,10 @@ func (great GreatDBManager) newGreatDBContainers(serviceName string, cluster *v1
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			PeriodSeconds:       10,
+			PeriodSeconds:       5,
 			InitialDelaySeconds: 30,
 			FailureThreshold:    3,
-			TimeoutSeconds:      5,
+			TimeoutSeconds:      2,
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{Command: []string{"ReadinessProbe"}},
 			},
@@ -813,10 +813,6 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			break
 		}
 
-		if cluster.Spec.Restart.Enable {
-			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRestart, "")
-			break
-		}
 	case v1alpha1.GreatDBPaxosPause:
 
 		if (cluster.Spec.Pause.Enable && cluster.Spec.Pause.Mode != v1alpha1.ClusterPause || !cluster.Spec.Pause.Enable) && cluster.Status.ReadyInstances > 0 {
@@ -828,6 +824,13 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 		if !cluster.Spec.Restart.Enable && cluster.Status.ReadyInstances == cluster.Status.Instances {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
+
+	case v1alpha1.GreatDBPaxosUpgrade:
+
+		if len(cluster.Status.UpgradeMember.Upgrading) == 0 && cluster.Status.ReadyInstances == cluster.Status.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "upgrade successful")
+		}
+
 	}
 
 	SetGreatDBclusterStatus(cluster)

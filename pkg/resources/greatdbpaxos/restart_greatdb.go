@@ -16,6 +16,10 @@ import (
 
 func (great GreatDBManager) restartGreatDB(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) (err error) {
 
+	if cluster.Status.Phase != v1alpha1.GreatDBPaxosReady && cluster.Status.Phase != v1alpha1.GreatDBPaxosRestart {
+		return nil
+	}
+
 	if cluster.Spec.Restart == nil {
 		cluster.Spec.Restart = &v1alpha1.RestartGreatDB{}
 	}
@@ -35,8 +39,16 @@ func (great GreatDBManager) restartGreatDB(cluster *v1alpha1.GreatDBPaxos, podIn
 		return great.restartCluster(cluster, podIns)
 	}
 
-	return great.restartInstance(cluster, podIns)
+	err = great.restartInstance(cluster, podIns)
+	if err != nil {
+		return err
+	}
 
+	if len(cluster.Status.UpgradeMember.Upgrading) > 0 {
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRestart, "")
+	}
+
+	return nil
 }
 
 func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {

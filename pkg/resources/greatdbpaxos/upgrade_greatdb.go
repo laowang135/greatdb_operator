@@ -10,6 +10,11 @@ import (
 
 // pauseGreatdb Whether to pause the return instance
 func (great GreatDBManager) upgradeGreatDB(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {
+
+	if cluster.Status.Phase != v1alpha1.GreatDBPaxosReady && cluster.Status.Phase != v1alpha1.GreatDBPaxosUpgrade {
+		return nil
+	}
+
 	if !podIns.DeletionTimestamp.IsZero() {
 		return nil
 	}
@@ -21,8 +26,16 @@ func (great GreatDBManager) upgradeGreatDB(cluster *v1alpha1.GreatDBPaxos, podIn
 		cluster.Status.UpgradeMember.Upgraded = make(map[string]string, 0)
 	}
 
-	return great.upgradeInstance(cluster, podIns)
+	err := great.upgradeInstance(cluster, podIns)
+	if err != nil {
+		return err
+	}
 
+	if len(cluster.Status.UpgradeMember.Upgrading) > 0 {
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosUpgrade, "")
+	}
+
+	return nil
 }
 
 // Pause successfully returns true

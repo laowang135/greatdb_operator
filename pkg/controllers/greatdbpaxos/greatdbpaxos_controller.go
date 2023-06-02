@@ -78,7 +78,7 @@ func NewGreatDBClusterController(
 		),
 		GreatdbClusterSynced: greatdbInformer.Greatdb().V1alpha1().GreatDBPaxoses().Informer().HasSynced,
 		managers:             manager,
-		queueMgr:             queueMgr.NewResourcesManager(60, 2),
+		queueMgr:             queueMgr.NewResourcesManager(30, 6),
 	}
 
 	dblog.Log.V(1).Info("setting up event handlers")
@@ -175,7 +175,7 @@ func (ctrl *GreatDBClusterController) processNextWorkItem() bool {
 			// Synchronization failed, rejoin the queue
 			ctrl.Queue.AddAfter(obj, deps.GetExponentialLevelDelay(num))
 
-			return fmt.Errorf("error syncing %s : %s, requeuing", key, err.Error())
+			return fmt.Errorf("error syncing %s: message: %s ", key, err.Error())
 
 		}
 		// This object is successfully synchronized, removed from the queue
@@ -186,8 +186,8 @@ func (ctrl *GreatDBClusterController) processNextWorkItem() bool {
 
 	if err != nil {
 		dblog.Log.Error(err.Error())
-
 	}
+
 	return true
 
 }
@@ -202,7 +202,7 @@ func (ctrl *GreatDBClusterController) Sync(key string) error {
 
 	if ctrl.queueMgr.Processing(key) {
 		dblog.Log.Infof("instance %s is currently being processed", key)
-		return queueMgr.HandlingLimitErr
+		return queueMgr.SkipErr
 	}
 	defer ctrl.queueMgr.EndOfProcessing(key)
 
@@ -234,7 +234,6 @@ func (ctrl *GreatDBClusterController) Sync(key string) error {
 		_, err = ctrl.Client.Clientset.GreatdbV1alpha1().GreatDBPaxoses(cluster.Namespace).Update(context.TODO(), newCluster, metav1.UpdateOptions{})
 
 		if err != nil {
-			dblog.Log.Reason(err).Errorf("Failed to update cluster %s default value", key)
 			return err
 		}
 		dblog.Log.Info("Updating cluster defaults succeeded")
@@ -242,7 +241,7 @@ func (ctrl *GreatDBClusterController) Sync(key string) error {
 
 	// update cluster
 	if err = ctrl.syncCluster(newCluster); err != nil {
-		return fmt.Errorf("failed to update cluster %s", key)
+		return err
 	}
 
 	//  update cluster
@@ -321,12 +320,6 @@ func (ctrl *GreatDBClusterController) syncCluster(cluster *gcv1alpha1.GreatDBPax
 		dblog.Log.Errorf("Failed to synchronize GreatDB , message: %s ", err.Error())
 		return err
 	}
-
-	// Synchronize pvc
-	// if err = ctrl.managers.Pvc.Sync(cluster); err != nil {
-	// 	dblog.Log.Errorf("Failed to synchronize pvc, message: %s ", err.Error())
-	// 	return err
-	// }
 
 	if err = ctrl.startForegroundDeletion(cluster); err != nil {
 		return err
@@ -484,6 +477,12 @@ func (ctrl *GreatDBClusterController) enqueuePodFn(obj interface{}) {
 
 func (ctrl *GreatDBClusterController) localWatch() {
 
-	res := ctrl.queueMgr.Watch(ctrl.Queue)
-	dblog.Log.Infof("Timing synchronization of greatdb cluster: %v", res)
+	ctrl.queueMgr.RWLock.Lock()
+	defer ctrl.queueMgr.RWLock.Unlock()
+	for key := range ctrl.queueMgr.Resources {
+		if ctrl.queueMgr.Add(key, false) {
+			ctrl.Queue.Add(key)
+		}
+	}
+
 }

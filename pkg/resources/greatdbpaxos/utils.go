@@ -123,9 +123,18 @@ func SetGreatDBclusterStatus(cluster *v1alpha1.GreatDBPaxos) {
 	case v1alpha1.GreatDBPaxosPending, v1alpha1.GreatDBPaxosDeployDB, v1alpha1.GreatDBPaxosBootCluster,
 		v1alpha1.GreatDBPaxosInitUser:
 		cluster.Status.Status = v1alpha1.ClusterStatusPending
-	case v1alpha1.GreatDBPaxosSucceeded, v1alpha1.GreatDBPaxosReady, v1alpha1.GreatDBPaxosUpgrade:
-		cluster.Status.Status = v1alpha1.ClusterStatusRunning
-		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
+	case v1alpha1.GreatDBPaxosUpgrade:
+		if cluster.Status.ReadyInstances > 0 {
+			cluster.Status.Status = v1alpha1.ClusterStatusRunning
+
+		}
+	case v1alpha1.GreatDBPaxosSucceeded, v1alpha1.GreatDBPaxosReady:
+
+		if cluster.Status.ReadyInstances == cluster.Spec.Instances {
+			cluster.Status.Status = v1alpha1.ClusterStatusRunning
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
+		}
+
 	case v1alpha1.GreatDBPaxosFailed:
 		cluster.Status.Status = v1alpha1.ClusterStatusFailed
 	case v1alpha1.GreatDBPaxosPause:

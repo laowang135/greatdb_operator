@@ -31,7 +31,7 @@ type Rescources struct {
 	FrequencyRecord []time.Time
 }
 
-func (mgr QueueManager) Add(key string, lock bool) bool {
+func (mgr *QueueManager) Add(key string, lock bool) bool {
 
 	if lock {
 		mgr.RWLock.Lock()
@@ -46,10 +46,10 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 
 			v.LastSyncTime = now
 
-			if len(v.FrequencyRecord) > mgr.FrequencyMinute {
+			v.FrequencyRecord = append(v.FrequencyRecord, now)
+			if len(v.FrequencyRecord) >= mgr.FrequencyMinute {
 				v.FrequencyRecord = v.FrequencyRecord[len(v.FrequencyRecord)-mgr.FrequencyMinute:]
 			}
-			v.FrequencyRecord = append(v.FrequencyRecord, now)
 
 			mgr.Resources[key] = v
 			return true
@@ -57,13 +57,16 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 
 		// Number of synchronizations per minute
 		index := 0
+		more := false
 		for i, record := range v.FrequencyRecord {
 			if now.Sub(record) > time.Minute {
 				index = i
+				more = true
 			}
+			break
 		}
 		var res []time.Time
-		if index+1 < len(v.FrequencyRecord) {
+		if more && index+1 <= len(v.FrequencyRecord) {
 			res = v.FrequencyRecord[index+1:]
 		}
 
@@ -90,7 +93,7 @@ func (mgr QueueManager) Add(key string, lock bool) bool {
 
 }
 
-func (mgr QueueManager) Delete(key string) {
+func (mgr *QueueManager) Delete(key string) {
 	mgr.RWLock.Lock()
 	defer mgr.RWLock.Unlock()
 	delete(mgr.Resources, key)
@@ -98,7 +101,7 @@ func (mgr QueueManager) Delete(key string) {
 }
 
 // Resources being processed
-func (mgr QueueManager) Processing(key string) bool {
+func (mgr *QueueManager) Processing(key string) bool {
 	_, ok := mgr.ProcessingResources.Load(key)
 
 	if !ok {
@@ -109,11 +112,11 @@ func (mgr QueueManager) Processing(key string) bool {
 	return true
 }
 
-func (mgr QueueManager) EndOfProcessing(key string) {
+func (mgr *QueueManager) EndOfProcessing(key string) {
 	mgr.ProcessingResources.Delete(key)
 }
 
-func (mgr QueueManager) Watch(queue workqueue.RateLimitingInterface) []string {
+func (mgr *QueueManager) Watch(queue workqueue.RateLimitingInterface) []string {
 
 	mgr.RWLock.Lock()
 	defer mgr.RWLock.Unlock()
