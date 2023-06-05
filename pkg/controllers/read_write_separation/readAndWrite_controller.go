@@ -14,6 +14,8 @@ import (
 	resourcesManager "greatdb-operator/pkg/resources/manager"
 	dblog "greatdb-operator/pkg/utils/log"
 
+	greatdbInformer "greatdb-operator/pkg/client/informers/externalversions"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
@@ -38,6 +40,7 @@ type ReadAndWriteController struct {
 func NewReadAndWriteController(
 	client *deps.ClientSet,
 	listers *deps.Listers,
+	greatdbInformer greatdbInformer.SharedInformerFactory,
 	kubeLabelInformer kubeinformer.SharedInformerFactory,
 ) *ReadAndWriteController {
 
@@ -55,12 +58,28 @@ func NewReadAndWriteController(
 			ControllerName,
 		),
 		managers: manager,
-		queueMgr: queueMgr.NewResourcesManager(20, 10),
+		queueMgr: queueMgr.NewResourcesManager(5, 12),
 	}
+
+	dblog.Log.V(1).Info("setting up event handlers")
+	greatdbInformer.Greatdb().V1alpha1().GreatDBPaxoses().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.addenqueueFn,
+		UpdateFunc: func(old, new interface{}) {
+			newCluster := new.(*gcv1alpha1.GreatDBPaxos)
+			oldCluster := old.(*gcv1alpha1.GreatDBPaxos)
+			// Skip processing if the versions are the same
+			if newCluster.ResourceVersion == oldCluster.ResourceVersion {
+				return
+			}
+			controller.enqueueFn(new)
+		},
+		DeleteFunc: controller.enqueueFn,
+	})
+
 	// Add the event handling hook of stateful set
 	dblog.Log.V(2).Info("Add the event handling hook of pods")
 	kubeLabelInformer.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueuePodFn,
+		AddFunc: controller.AddenqueuePodFn,
 		UpdateFunc: func(old, new interface{}) {
 			newPod := new.(*covev1.Pod)
 			oldPod := old.(*covev1.Pod)
@@ -110,7 +129,7 @@ func (ctrl *ReadAndWriteController) processNextWorkItem() bool {
 		return false
 	}
 
-	err := func(obj interface{}) error {
+	_ = func(obj interface{}) error {
 
 		defer ctrl.Queue.Done(obj)
 		var key string
@@ -124,12 +143,16 @@ func (ctrl *ReadAndWriteController) processNextWorkItem() bool {
 		}
 
 		if err := ctrl.Sync(key); err != nil {
+			if err == queueMgr.HandlingLimitErr {
+				dblog.Log.Infof(err.Error())
+				return nil
+			}
 			// Number of records processed
 			num := ctrl.Queue.NumRequeues(obj)
 			// Synchronization failed, rejoin the queue
 			ctrl.Queue.AddAfter(obj, deps.GetExponentialLevelDelay(num))
 
-			return fmt.Errorf("error syncing %s : %s, requeuing", key, err.Error())
+			return nil
 
 		}
 		// This object is successfully synchronized, removed from the queue
@@ -138,10 +161,6 @@ func (ctrl *ReadAndWriteController) processNextWorkItem() bool {
 		return nil
 	}(obj)
 
-	if err != nil {
-		dblog.Log.Error(err.Error())
-
-	}
 	return true
 
 }
@@ -154,11 +173,11 @@ func (ctrl *ReadAndWriteController) Sync(key string) error {
 	}
 
 	if ctrl.queueMgr.Processing(key) {
-		return queueMgr.HandlingLimitErr
+		return queueMgr.SkipErr
 	}
 	defer ctrl.queueMgr.EndOfProcessing(key)
 
-	dblog.Log.Infof("Synchronize read and write services for cluster  %s", key)
+	dblog.Log.Infof("Synchronize_read_and_write services for cluster  %s", key)
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		dblog.Log.Errorf("invalid resource key %s", key)
@@ -168,7 +187,6 @@ func (ctrl *ReadAndWriteController) Sync(key string) error {
 
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
-			dblog.Log.Errorf("Work queue does not have cluster %s", key)
 			ctrl.queueMgr.Delete(key)
 			return nil
 		}
@@ -180,7 +198,7 @@ func (ctrl *ReadAndWriteController) Sync(key string) error {
 
 	// update cluster
 	if err = ctrl.syncReadAndWrite(cluster); err != nil {
-		return fmt.Errorf("synchronize read and write services for cluster  %s", key)
+		return err
 	}
 
 	dblog.Log.Infof("Successfully Synchronize read and write services for cluster  %s", key)
@@ -191,8 +209,10 @@ func (ctrl *ReadAndWriteController) Sync(key string) error {
 // updateCluster Synchronize the cluster state to the desired state
 func (ctrl *ReadAndWriteController) syncReadAndWrite(cluster *gcv1alpha1.GreatDBPaxos) (err error) {
 
-	if cluster.Status.Phase.Stage() < v1alpha1.GreatDBPaxosReady.Stage() {
-		return
+	if cluster.Status.Status != v1alpha1.ClusterStatusRunning {
+		err = fmt.Errorf("waiting for cluster %s/%s to be ready", cluster.Namespace, cluster.Name)
+		dblog.Log.Info(err.Error())
+		return err
 
 	}
 
@@ -205,6 +225,65 @@ func (ctrl *ReadAndWriteController) syncReadAndWrite(cluster *gcv1alpha1.GreatDB
 	}
 
 	return nil
+}
+
+// addenqueueFn When creating a cluster, add the cluster to the queue
+func (ctrl *ReadAndWriteController) addenqueueFn(obj interface{}) {
+
+	var key string
+	var err error
+
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		dblog.Log.Errorf("Invalid object:  %s", err.Error())
+		return
+	}
+	dblog.Log.Infof("Listened to the greatdb-cluster add event, changed object %s", key)
+
+	ctrl.Queue.Add(key)
+
+}
+
+// enqueueFn When updating a cluster, delay adding the cluster to the queue
+func (ctrl *ReadAndWriteController) enqueueFn(obj interface{}) {
+
+	var key string
+	var err error
+
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		dblog.Log.Errorf("Invalid object:  %s", err.Error())
+		return
+	}
+	dblog.Log.Infof("Listened to the greatdb-cluster update event, update object %s", key)
+	// Wait five seconds before joining the queue
+	ctrl.Queue.AddAfter(key, time.Duration(5*time.Second))
+}
+
+func (ctrl *ReadAndWriteController) AddenqueuePodFn(obj interface{}) {
+
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return
+	}
+
+	clusterName, ok := pod.Labels[resources.AppKubeInstanceLabelKey]
+	if !ok {
+		return
+	}
+
+	_, err := ctrl.Listers.PaxosLister.GreatDBPaxoses(pod.Namespace).Get(clusterName)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			dblog.Log.V(3).Infof("The greatdb cluster instance %s/%s from pods %s/%s does not exist", pod.Namespace, clusterName, pod.Namespace, pod.Name)
+			return
+		}
+		dblog.Log.Error(err.Error())
+		return
+	}
+
+	key := fmt.Sprintf("%s/%s", pod.Namespace, clusterName)
+
+	// Wait five seconds before joining the queue
+	ctrl.Queue.Add(key)
 }
 
 // enqueueStsFn When the satisfied stateful set changes, obtain the cluster object from the stateful set and join the queue
@@ -238,5 +317,12 @@ func (ctrl *ReadAndWriteController) enqueuePodFn(obj interface{}) {
 
 func (ctrl *ReadAndWriteController) localWatch() {
 
-	ctrl.queueMgr.Watch(ctrl.Queue)
+	ctrl.queueMgr.RWLock.Lock()
+	defer ctrl.queueMgr.RWLock.Unlock()
+	for key := range ctrl.queueMgr.Resources {
+		if ctrl.queueMgr.Add(key, false) {
+			ctrl.Queue.Add(key)
+
+		}
+	}
 }

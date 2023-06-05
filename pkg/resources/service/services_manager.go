@@ -199,10 +199,12 @@ func (svc ServiceManager) getGreatDBServiceLabels(cluster *v1alpha1.GreatDBPaxos
 		if !cluster.Spec.PrimaryReadable {
 			labels[resources.AppKubeGreatDBRoleLabelKey] = string(v1alpha1.MemberRoleSecondary)
 		}
+		labels[resources.AppKubeServiceReadyLabelKey] = resources.AppKubeServiceReady
 
 	case GreatDBServiceWrite:
 		labels[resources.AppKubeGreatDBRoleLabelKey] = string(v1alpha1.MemberRolePrimary)
-		// case GreatDBServiceHeadless:
+		labels[resources.AppKubeServiceReadyLabelKey] = resources.AppKubeServiceReady
+
 	}
 
 	return labels

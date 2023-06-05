@@ -1,0 +1,88 @@
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: greatdbpaxos-operator-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  - pods
+  - secrets
+  - services
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - persistentvolumeclaims
+  - persistentvolumes
+  verbs:
+  - get
+  - create
+  - list
+  - update
+  - watch
+  - patch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+  - create
+  - patch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+  - create
+  - patch
+- apiGroups:
+  - greatdb.com
+  resources:
+  - greatdbpaxoses
+  - greatdbpaxoses/status
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+  - create
+  - patch
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: greatdbpaxos-operator
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: greatdbpaxos-operator-role-binding
+subjects:
+- kind: ServiceAccount
+  name: greatdbpaxos-operator
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: greatdbpaxos-operator-role
+  apiGroup: rbac.authorization.k8s.io

@@ -48,6 +48,10 @@ const (
 	AppKubePodLabelKey      = "app.kubernetes.io/pod-name"
 
 	AppKubeGreatDBRoleLabelKey = "app.kubernetes.io/role"
+
+	AppKubeServiceReadyLabelKey = "app.kubernetes.io/ready"
+	AppKubeServiceReady         = "true"
+	AppKubeServiceNotReady      = "false"
 )
 
 // Finalizers

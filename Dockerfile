@@ -4,7 +4,7 @@ FROM golang:1.18 as builder
 WORKDIR /workspace
 
 ARG GO111MODULE=on
-ARG GOPROXY='https://goproxy.cn'
+ARG GOPROXY='https://goproxy.cn,direct'
 
 # Copy the Go Modules manifests
 COPY go.mod go.mod

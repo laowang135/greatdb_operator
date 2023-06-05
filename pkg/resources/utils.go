@@ -76,6 +76,7 @@ func GetClusterUser(cluster *v1alpha1.GreatDBPaxos) (string, string) {
 }
 
 func GetInstanceFQDN(clusterName, insName, ns, clusterDomain string) string {
+	// TODO Debug
 
 	d := strings.Split(insName, "-")
 	no, err := strconv.Atoi(d[len(d)-1])

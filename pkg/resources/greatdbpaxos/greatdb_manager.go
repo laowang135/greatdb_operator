@@ -315,10 +315,10 @@ func (great GreatDBManager) newGreatDBContainers(serviceName string, cluster *v1
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
-			PeriodSeconds:       10,
+			PeriodSeconds:       5,
 			InitialDelaySeconds: 30,
 			FailureThreshold:    3,
-			TimeoutSeconds:      5,
+			TimeoutSeconds:      2,
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{Command: []string{"ReadinessProbe"}},
 			},
@@ -599,9 +599,11 @@ func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 		serverList := []resources.PaxosMember{}
 		err = client.Query(resources.QueryClusterMemberStatus, &serverList, resources.QueryClusterMemberFields)
 		if err != nil {
+			client.Close()
 			dblog.Log.Reason(err).Error("failed to query member status")
 			return err
 		}
+		client.Close()
 
 		for _, ser := range serverList {
 
@@ -664,6 +666,7 @@ func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 					client.Exec(sql[2])
 
 				}
+				client.Close()
 				return err
 			}
 		}
@@ -671,6 +674,7 @@ func (great GreatDBManager) bootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 		if cluster.Status.BootIns == "" {
 			cluster.Status.BootIns = member.Name
 		}
+		client.Close()
 
 	}
 
@@ -684,6 +688,7 @@ func (great GreatDBManager) initUser(cluster *v1alpha1.GreatDBPaxos) error {
 		dblog.Log.Reason(err).Error("failed to Connect dbscale")
 		return err
 	}
+	defer client.Close()
 
 	initUser := v1alpha1.User{}
 
@@ -813,10 +818,6 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			break
 		}
 
-		if cluster.Spec.Restart.Enable {
-			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRestart, "")
-			break
-		}
 	case v1alpha1.GreatDBPaxosPause:
 
 		if (cluster.Spec.Pause.Enable && cluster.Spec.Pause.Mode != v1alpha1.ClusterPause || !cluster.Spec.Pause.Enable) && cluster.Status.ReadyInstances > 0 {
@@ -828,6 +829,13 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 		if !cluster.Spec.Restart.Enable && cluster.Status.ReadyInstances == cluster.Status.Instances {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
+
+	case v1alpha1.GreatDBPaxosUpgrade:
+
+		if len(cluster.Status.UpgradeMember.Upgrading) == 0 && cluster.Status.ReadyInstances == cluster.Status.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "upgrade successful")
+		}
+
 	}
 
 	SetGreatDBclusterStatus(cluster)
@@ -890,6 +898,7 @@ func (great GreatDBManager) GreatDBIsReady(cluster *v1alpha1.GreatDBPaxos) error
 			dblog.Log.Errorf("Failed to connect to database %s, message: %s", uri, err.Error())
 			return err
 		}
+		cli.Close()
 	}
 
 	return nil
@@ -935,9 +944,11 @@ func (great GreatDBManager) getDataServerList(cluster *v1alpha1.GreatDBPaxos) []
 
 		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
 		if err != nil {
+			sqlClient.Close()
 			dblog.Log.Reason(err).Errorf("failed to query cluster status")
 			continue
 		}
+		sqlClient.Close()
 		for _, status := range memberList {
 			if status.State == string(v1alpha1.MemberStatusOnline) {
 				return memberList
@@ -1044,12 +1055,14 @@ func (great GreatDBManager) startGroupReplication(cluster *v1alpha1.GreatDBPaxos
 
 			err = client.Exec("stop group_replication;")
 			if err != nil {
+
 				dblog.Log.Reason(err).Error("failed to exec sql")
 			}
 			err = client.Exec(sql)
 			if err != nil {
 				dblog.Log.Reason(err).Error("failed to exec sql")
 			}
+			client.Close()
 		}
 	}
 
