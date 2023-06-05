@@ -72,10 +72,7 @@ func (great ReadAndWriteManager) updateRole(cluster *v1alpha1.GreatDBPaxos) erro
 			ins.Role = v1alpha1.MemberRoleUnknown
 		}
 
-		err = great.updatePod(ns, member.Name, ins.Role, ins.Type, cluster)
-		if err != nil {
-			return err
-		}
+		great.updatePod(ns, member.Name, ins.Role, ins.Type, cluster)
 
 	}
 	return nil
@@ -130,9 +127,11 @@ func (great ReadAndWriteManager) GetMemberList(cluster *v1alpha1.GreatDBPaxos) (
 
 		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
 		if err != nil {
+			sqlClient.Close()
 			log.Log.Reason(err).Errorf("failed to query cluster status")
 			return memberList, err
 		}
+		sqlClient.Close()
 		for _, status := range memberList {
 			if status.State == string(v1alpha1.MemberStatusOnline) {
 				return memberList, nil

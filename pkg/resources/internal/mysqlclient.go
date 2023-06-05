@@ -39,7 +39,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 	// connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?interpolateParams=true&timeout=5s",
 	// 	user, pass, host, port, dbname)
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true&timeout=5s",
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true&timeout=3s",
 		user, pass, host, dbname)
 	db, err := sql.Open("mysql", connStr)
 
