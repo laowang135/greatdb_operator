@@ -117,6 +117,7 @@ func (great GreatDBManager) UpdatePvc(cluster *v1alpha1.GreatDBPaxos, pvc *corev
 			context.TODO(), pvc.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			dblog.Log.Errorf("failed to delete finalizers of pvc %s/%s,message: %s", pvc.Namespace, pvc.Name, err.Error())
+			return err
 		}
 
 		return nil
@@ -165,10 +166,16 @@ func (great GreatDBManager) UpdatePvc(cluster *v1alpha1.GreatDBPaxos, pvc *corev
 	}
 
 	result := pvc.Spec.Resources.Requests.Storage().Cmp(*cluster.Spec.VolumeClaimTemplates.Resources.Requests.Storage())
+
 	// old < new
 	if result == -1 {
 		allow, reason, err := great.AllowVolumeExpansion(pvc)
-		if err == nil && allow {
+
+		if err != nil {
+			dblog.Log.Reason(err).Error(reason)
+			return err
+		}
+		if allow {
 			storage := make(corev1.ResourceList)
 			storage[corev1.ResourceStorage] = *cluster.Spec.VolumeClaimTemplates.Resources.Requests.Storage()
 
@@ -176,9 +183,16 @@ func (great GreatDBManager) UpdatePvc(cluster *v1alpha1.GreatDBPaxos, pvc *corev
 			data := fmt.Sprintf(`{"op":"replace","path":"/spec/resources/requests","value":%s}`, sto)
 			changeArr = append(changeArr, data)
 
+		} else {
+			message := fmt.Sprintf("%s to %s:  %s", pvc.Spec.Resources.Requests.Storage().String(), cluster.Spec.VolumeClaimTemplates.Resources.Requests.Storage().String(), reason)
+			great.Recorder.Event(cluster, corev1.EventTypeWarning, StorageVerticalExpansionNotSupport, message)
+			cluster.Spec.VolumeClaimTemplates.Resources.Requests[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 		}
 
-		dblog.Log.Reason(err).Error(reason)
+	} else if result == 1 {
+		message := fmt.Sprintf("%s to %s", pvc.Spec.Resources.Requests.Storage().String(), cluster.Spec.VolumeClaimTemplates.Resources.Requests.Storage().String())
+		great.Recorder.Event(cluster, corev1.EventTypeWarning, StorageVerticalShrinkagegprohibit, message)
+		cluster.Spec.VolumeClaimTemplates.Resources.Requests[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	}
 
 	patch := ""
@@ -281,7 +295,7 @@ func (great GreatDBManager) AllowVolumeExpansion(pvc *corev1.PersistentVolumeCla
 		return allow, reason, err
 	}
 
-	if !*storageClass.AllowVolumeExpansion {
+	if storageClass.AllowVolumeExpansion == nil || !*storageClass.AllowVolumeExpansion {
 		reason = fmt.Sprintf("Field AllowVolumeExpansion of storageClass %s is false, Capacity expansion is not allowed", storageClassName)
 		return allow, reason, nil
 	}

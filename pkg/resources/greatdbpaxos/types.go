@@ -7,3 +7,9 @@ const (
 	greatdbDataMountPath   string = "/greatdb/mysql/"
 	GreatDBContainerName          = "greatdb"
 )
+
+// pvc
+const (
+	StorageVerticalShrinkagegprohibit  = "Storage is prohibited from shrinking and configuration is rolled back"
+	StorageVerticalExpansionNotSupport = "Storage does not support dynamic expansion"
+)

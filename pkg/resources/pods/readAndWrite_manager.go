@@ -121,6 +121,7 @@ func (great ReadAndWriteManager) GetMemberList(cluster *v1alpha1.GreatDBPaxos) (
 		host := resources.GetInstanceFQDN(clusterName, member.Name, ns, clusterDomain)
 		err := sqlClient.Connect(user, pwd, host, port, "mysql")
 		if err != nil {
+			log.Log.Reason(err).Error("connection_error")
 			continue
 		}
 		memberList := make([]resources.PaxosMember, 0)
