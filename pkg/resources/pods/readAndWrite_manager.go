@@ -7,11 +7,9 @@ import (
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
-	"greatdb-operator/pkg/resources/internal"
-	"strings"
-
 	"greatdb-operator/pkg/utils/log"
 
+	"greatdb-operator/pkg/resources/greatdbpaxos"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,51 +33,18 @@ func (great ReadAndWriteManager) Sync(cluster *v1alpha1.GreatDBPaxos) error {
 func (great ReadAndWriteManager) updateRole(cluster *v1alpha1.GreatDBPaxos) error {
 
 	ns := cluster.Namespace
-	memberList, err := great.GetMemberList(cluster)
-	if err != nil {
-		return err
-	}
+	diag := greatdbpaxos.DiagnoseCluster(cluster, great.Lister)
 
-	insStatusSet := make(map[string]v1alpha1.MemberCondition)
-
-	for _, ser := range memberList {
-
-		splitHost := strings.Split(ser.Host, ".")
-		name := ""
-		if len(splitHost) > 0 {
-			name = splitHost[0]
+	for _, ins := range diag.AllInstance {
+		if err := great.updatePod(ns, ins.PodIns.Name, ins.Role, ins.State, cluster); err != nil {
+			return err
 		}
-
-		insStatusSet[name] = v1alpha1.MemberCondition{
-			Name: name,
-			Type: v1alpha1.MemberConditionType(ser.State).Parse(),
-			Role: v1alpha1.MemberRoleType(ser.Role).Parse(),
-		}
-
-	}
-	var ins v1alpha1.MemberCondition
-	for _, member := range cluster.Status.Member {
-
-		ok := false
-		if ins, ok = insStatusSet[member.Name]; !ok {
-			ins = v1alpha1.MemberCondition{
-				Role: v1alpha1.MemberRoleUnknown,
-				Type: v1alpha1.MemberStatusFree,
-			}
-		}
-
-		if ins.Type != v1alpha1.MemberStatusOnline && ins.Type != v1alpha1.MemberStatusRecovering {
-			ins.Role = v1alpha1.MemberRoleUnknown
-		}
-
-		great.updatePod(ns, member.Name, ins.Role, ins.Type, cluster)
-
 	}
 	return nil
 
 }
 
-func (great ReadAndWriteManager) updatePod(ns, podName string, role v1alpha1.MemberRoleType, status v1alpha1.MemberConditionType, cluster *v1alpha1.GreatDBPaxos) error {
+func (great ReadAndWriteManager) updatePod(ns, podName string, role string, status v1alpha1.MemberConditionType, cluster *v1alpha1.GreatDBPaxos) error {
 
 	pod, err := great.Lister.PodLister.Pods(ns).Get(podName)
 	if err != nil {
@@ -103,48 +68,10 @@ func (great ReadAndWriteManager) updatePod(ns, podName string, role v1alpha1.Mem
 	}
 
 	return nil
-}
-
-func (great ReadAndWriteManager) GetMemberList(cluster *v1alpha1.GreatDBPaxos) ([]resources.PaxosMember, error) {
-
-	ns := cluster.Namespace
-	clusterName := cluster.Name
-	clusterDomain := cluster.Spec.ClusterDomain
-	port := int(cluster.Spec.Port)
-	user, pwd := resources.GetClusterUser(cluster)
-
-	sqlClient := internal.NewDBClient()
-	for _, member := range cluster.Status.Member {
-		if member.Type == v1alpha1.MemberStatusPause {
-			continue
-		}
-		host := resources.GetInstanceFQDN(clusterName, member.Name, ns, clusterDomain)
-		err := sqlClient.Connect(user, pwd, host, port, "mysql")
-		if err != nil {
-			log.Log.Reason(err).Error("connection_error")
-			continue
-		}
-		memberList := make([]resources.PaxosMember, 0)
-
-		err = sqlClient.Query(resources.QueryClusterMemberStatus, &memberList, resources.QueryClusterMemberFields)
-		if err != nil {
-			sqlClient.Close()
-			log.Log.Reason(err).Errorf("failed to query cluster status")
-			return memberList, err
-		}
-		sqlClient.Close()
-		for _, status := range memberList {
-			if status.State == string(v1alpha1.MemberStatusOnline) {
-				return memberList, nil
-			}
-		}
-	}
-	log.Log.Errorf("Cluster %s/%s error", ns, clusterName)
-	return nil, nil
 
 }
 
-func (great ReadAndWriteManager) updateLabels(pod *corev1.Pod, cluster *v1alpha1.GreatDBPaxos, role v1alpha1.MemberRoleType, status v1alpha1.MemberConditionType) (bool, string) {
+func (great ReadAndWriteManager) updateLabels(pod *corev1.Pod, cluster *v1alpha1.GreatDBPaxos, role string, status v1alpha1.MemberConditionType) (bool, string) {
 	needUpdate := false
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)

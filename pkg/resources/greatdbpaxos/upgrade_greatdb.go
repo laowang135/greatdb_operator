@@ -101,13 +101,13 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		if len(cluster.Status.UpgradeMember.Upgrading) > 0 {
 			return nil
 		}
-
-		memberList := great.getDataServerList(cluster)
+		diag := great.ProbeStatus(cluster)
+		memberList := diag.OnlineMembers
 		canUpgrade := false
 		secondaryAllUpgrade := true
 		for _, member := range memberList {
-			splitName := strings.Split(member.Host, ".")
-			name := member.Host
+			splitName := strings.Split(member.MemberHost, ".")
+			name := member.MemberHost
 			if len(splitName) > 0 {
 				name = splitName[0]
 			}

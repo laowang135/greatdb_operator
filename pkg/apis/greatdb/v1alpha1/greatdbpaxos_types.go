@@ -259,6 +259,9 @@ type MemberCondition struct {
 
 	Index int `json:"index"`
 
+	// Whether you have been added to a cluster
+	JoinCluster bool `json:"joinCluster,omitempty"`
+
 	// Instance Access Address
 	Address string `json:"address"`
 
@@ -296,6 +299,11 @@ type GreatDBPaxosStatus struct {
 	// The state of the cluster
 	// +optional
 	Status ClusterStatusType `json:"status,omitempty"`
+	// The diag state of the cluster
+	// +optional
+	DiagStatus ClusterDiagStatusType `json:"diagStatus,omitempty"`
+
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
 
 	// The phase of a cluster is a simple, high-level summary of where the cluster is in its lifecycle.
 	// +optional

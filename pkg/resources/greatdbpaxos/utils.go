@@ -1,8 +1,9 @@
 package greatdbpaxos
 
 import (
-	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -10,7 +11,6 @@ import (
 
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	"greatdb-operator/pkg/resources"
-	"greatdb-operator/pkg/resources/internal"
 )
 
 func SplitImage(imageName string) (repo, tag string) {
@@ -117,32 +117,6 @@ func UpdateClusterStatusCondition(cluster *v1alpha1.GreatDBPaxos, statusType v1a
 
 }
 
-func SetGreatDBclusterStatus(cluster *v1alpha1.GreatDBPaxos) {
-
-	switch cluster.Status.Phase {
-	case v1alpha1.GreatDBPaxosPending, v1alpha1.GreatDBPaxosDeployDB, v1alpha1.GreatDBPaxosBootCluster,
-		v1alpha1.GreatDBPaxosInitUser:
-		cluster.Status.Status = v1alpha1.ClusterStatusPending
-	case v1alpha1.GreatDBPaxosUpgrade:
-		if cluster.Status.ReadyInstances > 0 {
-			cluster.Status.Status = v1alpha1.ClusterStatusRunning
-
-		}
-	case v1alpha1.GreatDBPaxosSucceeded, v1alpha1.GreatDBPaxosReady:
-
-		if cluster.Status.ReadyInstances == cluster.Spec.Instances {
-			cluster.Status.Status = v1alpha1.ClusterStatusRunning
-			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
-		}
-
-	case v1alpha1.GreatDBPaxosFailed:
-		cluster.Status.Status = v1alpha1.ClusterStatusFailed
-	case v1alpha1.GreatDBPaxosPause:
-		cluster.Status.Status = ""
-
-	}
-}
-
 func GetNextIndex(memberList []v1alpha1.MemberCondition) int {
 	index := -1
 
@@ -154,38 +128,6 @@ func GetNextIndex(memberList []v1alpha1.MemberCondition) int {
 	return index + 1
 }
 
-func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClientinterface, error) {
-
-	user, pwd := resources.GetClusterUser(cluster)
-	port := int(cluster.Spec.Port)
-
-	client := internal.NewDBClient()
-
-	for _, member := range cluster.Status.Member {
-
-		if member.Type != v1alpha1.MemberStatusFree && member.Type != v1alpha1.MemberStatusOnline {
-			continue
-		}
-		// TODO Debug
-		// host := member.Address
-		// if host == "" {
-		// 	host = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
-		// }
-
-		host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
-
-		err := client.Connect(user, pwd, host, port, "mysql")
-
-		if err != nil {
-			return nil, err
-		}
-		return client, nil
-
-	}
-	return nil, fmt.Errorf("no available connections")
-
-}
-
 func GetNowTime() string {
 
 	return time.Now().Local().Format("2006-01-02 15:04:05")
@@ -195,4 +137,86 @@ func StringToTime(value string) time.Time {
 
 	n, _ := time.ParseInLocation("2006-01-02 15:04:05", value, time.Local)
 	return n
+}
+
+func CountGtids(gtidSet string) int {
+	// Return number of transactions in the GTID set
+	countRange := func(r string) int {
+		parts := strings.Split(r, "-")
+		if len(parts) == 1 {
+			return 1
+		} else {
+			begin, _ := strconv.Atoi(parts[0])
+			end, _ := strconv.Atoi(parts[1])
+			return end - begin + 1
+		}
+	}
+	n := 0
+	gtidSet = strings.ReplaceAll(gtidSet, "\n", "")
+	gtidList := strings.Split(gtidSet, ",")
+	for _, g := range gtidList {
+		rList := strings.Split(g, ":")[1:]
+		for _, r := range rList {
+			n += countRange(r)
+		}
+	}
+	return n
+}
+
+func containsUnreachableStates(clusterDiagStatus v1alpha1.ClusterDiagStatusType) bool {
+	unreachableStates := []v1alpha1.ClusterDiagStatusType{
+		v1alpha1.ClusterDiagStatusUnknown,
+		v1alpha1.ClusterDiagStatusOnlineUncertain,
+		v1alpha1.ClusterDiagStatusOfflineUncertain,
+		v1alpha1.ClusterDiagStatusNoQuorumUncertain,
+		v1alpha1.ClusterDiagStatusSplitBrainUncertain,
+	}
+
+	for _, us := range unreachableStates {
+		if us == clusterDiagStatus {
+			return true
+		}
+	}
+	return false
+}
+
+func updateStatusCheck(cluster *v1alpha1.GreatDBPaxos) bool {
+	clusterLastProbeTime := cluster.Status.LastProbeTime
+	if clusterLastProbeTime.IsZero() {
+		return true
+	}
+
+	for _, condition := range cluster.Status.Conditions {
+		if condition.LastTransitionTime.IsZero() {
+			continue
+		}
+		if condition.Type == v1alpha1.GreatDBPaxosRepair && condition.Status == "True" {
+			return true
+		}
+		if metav1.Now().Sub(clusterLastProbeTime.Time) > metav1.Now().Sub(condition.LastTransitionTime.Time) {
+			return true
+		}
+	}
+	if metav1.Now().Sub(clusterLastProbeTime.Time) > time.Minute*1 {
+		return true
+	}
+	return containsUnreachableStates(cluster.Status.DiagStatus)
+}
+
+func SubtractSlices(a, b []string) []string {
+	setA := make(map[string]bool)
+	for _, v := range a {
+		setA[v] = true
+	}
+	setB := make(map[string]bool)
+	for _, v := range b {
+		setB[v] = true
+	}
+	result := []string{}
+	for k := range setA {
+		if !setB[k] {
+			result = append(result, k)
+		}
+	}
+	return result
 }

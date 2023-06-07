@@ -209,7 +209,7 @@ func (ctrl *ReadAndWriteController) Sync(key string) error {
 // updateCluster Synchronize the cluster state to the desired state
 func (ctrl *ReadAndWriteController) syncReadAndWrite(cluster *gcv1alpha1.GreatDBPaxos) (err error) {
 
-	if cluster.Status.Status != v1alpha1.ClusterStatusRunning {
+	if cluster.Status.Status != v1alpha1.ClusterStatusOnline {
 		err = fmt.Errorf("waiting for cluster %s/%s to be ready", cluster.Namespace, cluster.Name)
 		dblog.Log.Info(err.Error())
 		return err
@@ -220,7 +220,7 @@ func (ctrl *ReadAndWriteController) syncReadAndWrite(cluster *gcv1alpha1.GreatDB
 		return
 	}
 
-	if err := ctrl.managers.Pods.Sync(cluster); err != nil {
+	if err = ctrl.managers.Pods.Sync(cluster); err != nil {
 		return err
 	}
 

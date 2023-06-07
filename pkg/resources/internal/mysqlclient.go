@@ -1,15 +1,47 @@
 package internal
 
 import (
+	"context"
 	"database/sql"
+	"time"
+
 	// "encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysql "github.com/go-sql-driver/mysql"
 )
+
+// MysqlErrorCode - https://dev.mysql.com/doc/dev/mysql-server/latest/errmsg_8h.html#aced7c95eea994d599feefd883f1d28ed
+const (
+	CR_MIN_ERROR uint16 = 2000
+	CR_MAX_ERROR uint16 = 2999
+)
+
+const (
+	// Authentication errors aren't supposed to happen because we
+	// only use an account we own, so access denied would indicate
+	// something or someone broke our account or worse.
+	ER_ACCESS_DENIED_ERROR     uint16 = 1045
+	ER_ACCOUNT_HAS_BEEN_LOCKED uint16 = 3118
+
+	// Same as above, but for errors that happen while executing SQL.
+	ER_MUST_CHANGE_PASSWORD         uint16 = 1862
+	ER_NO_DB_ERROR                  uint16 = 1046
+	ER_NO_SUCH_TABLE                uint16 = 1146
+	ER_UNKNOWN_SYSTEM_VARIABLE      uint16 = 1193
+	ER_SPECIFIC_ACCESS_DENIED_ERROR uint16 = 1227
+	ER_TABLEACCESS_DENIED_ERROR     uint16 = 1142
+	ER_COLUMNACCESS_DENIED_ERROR    uint16 = 1143
+	ER_SP_DOES_NOT_EXIST            uint16 = 1305
+)
+
+var FATAL_MYSQL_ERRORS = []uint16{ER_ACCESS_DENIED_ERROR,
+	ER_ACCOUNT_HAS_BEEN_LOCKED, ER_MUST_CHANGE_PASSWORD,
+	ER_NO_DB_ERROR, ER_NO_SUCH_TABLE, ER_UNKNOWN_SYSTEM_VARIABLE,
+	ER_SPECIFIC_ACCESS_DENIED_ERROR, ER_TABLEACCESS_DENIED_ERROR, ER_COLUMNACCESS_DENIED_ERROR}
 
 type DBClientinterface interface {
 	Connect(user, pass, host string, port int, dbname string) error
@@ -17,8 +49,10 @@ type DBClientinterface interface {
 	Exec(string, ...interface{}) error
 	UpdateDBVariables([]DBVariable) error
 	Query(query string, dest interface{}, fields []string) error
+	QueryRow(query string, dest ...any) error
 	GetTableData(query string) ([]map[string]interface{}, error)
 	Close() error
+	GetError() (*uint16, *string)
 }
 
 type DBVariable struct {
@@ -27,7 +61,9 @@ type DBVariable struct {
 }
 
 type defaultDBClient struct {
-	db *sql.DB
+	db               *sql.DB
+	ConnectError     *string
+	ConnectErrorCode *uint16
 }
 
 func NewDBClient() DBClientinterface {
@@ -47,12 +83,35 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 		return fmt.Errorf("failed to connect to mysql: %s:%d, reason: %v", host, port, err)
 	}
 
-	err = db.Ping()
-	if err != nil {
+	db.SetConnMaxLifetime(2 * time.Second)
+	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(10)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err = db.PingContext(ctx); err != nil {
+		if e, ok := err.(*mysql.MySQLError); ok {
+			client.ConnectErrorCode = &e.Number
+			client.ConnectError = &e.Message
+		}
 		return fmt.Errorf("failed ping database to mysql: %s:%d, reason: %v", host, port, err)
 	}
 	client.db = db
 	return nil
+}
+
+func (client *defaultDBClient) GetError() (*uint16, *string) {
+	return client.ConnectErrorCode, client.ConnectError
+}
+
+func CheckFatalConnect(errCode uint16) bool {
+	for _, fatal := range FATAL_MYSQL_ERRORS {
+		if errCode == fatal {
+			return true
+		}
+	}
+	return false
 }
 
 func NewDBVariable(options map[string]string) (dbVariables []DBVariable) {
@@ -130,7 +189,7 @@ func (client *defaultDBClient) updateVariables(query string, dbVariables []DBVar
 	return nil
 }
 
-//Query  Execute the query statement and return the result to dest
+// Query  Execute the query statement and return the result to dest
 // params
 // query : Query statement as: select * from test
 // dest: Copy the query value to dest, which requires a slice structure of pointer type
@@ -194,6 +253,16 @@ func (client *defaultDBClient) Query(query string, dest interface{}, fields []st
 
 	T1.Set(T)
 	return nil
+}
+
+func (client *defaultDBClient) QueryRow(query string, dest ...any) error {
+	err := client.db.QueryRow(query).Scan(dest...)
+	if err != nil {
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+			fmt.Printf("MySQL Error %d: %s\n", mysqlErr.Number, mysqlErr.Message)
+		}
+	}
+	return err
 }
 
 func (client *defaultDBClient) GetTableData(query string) ([]map[string]interface{}, error) {
