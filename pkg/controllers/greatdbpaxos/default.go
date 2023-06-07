@@ -84,12 +84,6 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 		cluster.Spec.Service.Type = corev1.ServiceTypeClusterIP
 	}
 
-	if cluster.Spec.Service.Type == corev1.ServiceTypeNodePort {
-		if cluster.Spec.Service.ReadPort == 0 || cluster.Spec.Service.WritePort == 0 {
-			cluster.Spec.Service.Type = corev1.ServiceTypeClusterIP
-		}
-	}
-
 	// restart
 
 	if cluster.Spec.Restart == nil {

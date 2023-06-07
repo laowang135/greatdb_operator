@@ -11,7 +11,11 @@
             "mode": "auto",
             "program": "./cmd/controller-manager/server.go",
             "args": [
-                "--kubeconfig=/home/gz/.kube/config"
+                "--kubeconfig=/home/gz/.kube/config",
+                "--webhooks=true",
+                "--tlsKeyFile=/data/gz/GreatDBProject/webhook/tls/server-key.pem",
+                "--tlsCertFile=/data/gz/GreatDBProject/webhook/tls/server.crt",
+                "--port=9000"
             ]
         }
     ]

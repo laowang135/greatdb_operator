@@ -6,6 +6,7 @@ import (
 
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	"greatdb-operator/pkg/greatdb-api/webhooks/utils"
+	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/utils/log"
 
 	admissionv1 "k8s.io/api/admission/v1"
@@ -37,7 +38,8 @@ func ValidatingGreatDBClusterSpec(field *k8sfield.Path, ns string, spec *v1alpha
 	causes = append(causes, ValidatingSecretName(field.Child("secretName"), ns, spec.SecretName, client)...)
 	causes = append(causes, ValidatingPriorityClassName(field.Child("priorityClassName"), spec.PriorityClassName, client)...)
 	causes = append(causes, ValidatingImagePullSecrets(field.Child("imagePullSecrets"), ns, spec.ImagePullSecrets, client)...)
-
+	causes = append(causes, ValidatingPort(field.Child("port"), ns, spec.Port)...)
+	causes = append(causes, ValidatingService(field.Child("service"), spec.Service, client)...)
 	return causes
 
 }
@@ -119,6 +121,85 @@ func ValidatingImagePullSecrets(field *k8sfield.Path, ns string, imagePullSecret
 			})
 		}
 
+	}
+
+	return causes
+}
+
+func ValidatingPort(field *k8sfield.Path, ns string, port int32) []metav1.StatusCause {
+	var causes []metav1.StatusCause
+
+	if port == resources.GroupPort {
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeFieldValueInvalid,
+			Message: fmt.Sprintf("the service port(%d) is not allowed to be the same as the group replication port(%d)", port, resources.GroupPort),
+			Field:   field.String(),
+		})
+	}
+
+	return causes
+}
+
+func ValidatingService(field *k8sfield.Path, service v1alpha1.ServiceType, client kubernetes.Interface) []metav1.StatusCause {
+	var causes []metav1.StatusCause
+
+	if service.Type != corev1.ServiceTypeNodePort {
+		return causes
+	}
+
+	if service.ReadPort == 0 && service.WritePort == 0 {
+		return causes
+	}
+
+	if service.ReadPort == service.WritePort {
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeFieldValueInvalid,
+			Message: fmt.Sprintf("Invalid value: readPort【%d], writePort【%d】: Prohibit setting to the same value", service.ReadPort, service.WritePort),
+			Field:   field.String(),
+		})
+	}
+
+	serviceList, err := client.CoreV1().Services(corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return causes
+	}
+
+	read := false
+	if service.ReadPort == 0 {
+		read = true
+	}
+	write := false
+	if service.WritePort == 0 {
+		write = true
+	}
+	for _, svc := range serviceList.Items {
+
+		if read && write {
+			break
+		}
+		if svc.Spec.Type != corev1.ServiceTypeNodePort {
+			continue
+		}
+
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort == service.ReadPort {
+				read = true
+				causes = append(causes, metav1.StatusCause{
+					Type:    metav1.CauseTypeFieldValueInvalid,
+					Message: fmt.Sprintf("Invalid value: %d: provided port is already allocated", service.ReadPort),
+					Field:   field.Child("readPort").String(),
+				})
+			}
+
+			if port.NodePort == service.WritePort {
+				write = true
+				causes = append(causes, metav1.StatusCause{
+					Type:    metav1.CauseTypeFieldValueInvalid,
+					Message: fmt.Sprintf("Invalid value: %d: provided port is already allocated", service.WritePort),
+					Field:   field.Child("writePort").String(),
+				})
+			}
+		}
 	}
 
 	return causes

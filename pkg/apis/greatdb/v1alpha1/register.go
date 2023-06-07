@@ -20,5 +20,5 @@ var (
 var GreatDBClusterGroupVersionResource = metav1.GroupVersionResource{
 	Group:    GroupVersion.Group,
 	Version:  GroupVersion.Version,
-	Resource: "GreatDBPaxoses",
+	Resource: "greatdbpaxoses",
 }
