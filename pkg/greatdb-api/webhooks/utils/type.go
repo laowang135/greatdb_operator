@@ -5,6 +5,6 @@ var (
 )
 
 const (
-	GreatDBCreateValidatePath = "/greatdbcluster-validate-create"
-	GreatDBUpdateValidatePath = "/greatdbcluster-validate-update"
+	GreatDBCreateValidatePath = "/greatdbpaxos-validate-create"
+	GreatDBUpdateValidatePath = "/greatdbpaxos-validate-update"
 )

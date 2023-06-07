@@ -44,7 +44,7 @@ func Server(greatDBClient versioned.Interface, kubeClient kubernetes.Interface, 
 		tlsCfg, err := configTLS(tlsKeyFile, tlsCertFile)
 		if err != nil {
 			log.Log.Reason(err).Error("Failed to start webhooks service")
-			return
+			panic(err)
 		}
 		server := http.Server{
 			Addr:      fmt.Sprintf(":%d", port),

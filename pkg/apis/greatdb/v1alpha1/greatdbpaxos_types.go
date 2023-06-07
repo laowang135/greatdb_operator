@@ -111,6 +111,8 @@ type GreatDBPaxosSpec struct {
 	//  Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always
 	// if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated.
 	// +optional
+	// +kubebuilder:default="Always"
+	// +kubebuilder:validation:Enum="Always";"IfNotPresent"
 	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// ImagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images.
