@@ -30,12 +30,107 @@ const (
 	RollingRestart RestartStrategyType = "rolling"
 )
 
+type CandidateDiagStatus string
+
+const (
+	CandidateDiagStatusUnknown CandidateDiagStatus = "UNKNOWN"
+
+	// MEMBER Instance is already a member of the cluster
+	CandidateDiagStatusMember CandidateDiagStatus = "MEMBER"
+
+	// REJOINABLE Instance is a member of the cluster but can rejoin it
+	CandidateDiagStatusRejoinable CandidateDiagStatus = "REJOINABLE"
+
+	// JOINABLE Instance is not yet a member of the cluster but can join it
+	CandidateDiagStatusJoinable CandidateDiagStatus = "JOINABLE"
+
+	// BROKEN Instance is a member of the cluster but has a problem that prevents it from rejoining
+	CandidateDiagStatusBroken CandidateDiagStatus = "BROKEN"
+
+	// UNSUITABLE Instance is not yet a member of the cluster and can't join it
+	CandidateDiagStatusUnsuitable CandidateDiagStatus = "UNSUITABLE"
+
+	CandidateDiagStatusUnreachable CandidateDiagStatus = "UNREACHABLE"
+)
+
 type ClusterStatusType string
 
 const (
-	ClusterStatusPending ClusterStatusType = "Pending"
-	ClusterStatusRunning ClusterStatusType = "Running"
-	ClusterStatusFailed  ClusterStatusType = "Failed"
+	ClusterStatusOnline       ClusterStatusType = "ONLINE"
+	ClusterStatusOffline      ClusterStatusType = "OFFLINE"
+	ClusterStatusInitializing ClusterStatusType = "INITIALIZING"
+	ClusterStatusPending      ClusterStatusType = "PENDING"
+	ClusterStatusFailed       ClusterStatusType = "FAILED"
+)
+
+type ClusterDiagStatusType string
+
+const (
+	// ClusterDiagStatusOnline - All members are reachable or part of the quorum
+	// - Reachable members form a quorum between themselves
+	// - There are no unreachable members that are not in the quorum
+	// - All members are ONLINE
+	ClusterDiagStatusOnline ClusterDiagStatusType = "ONLINE"
+
+	// ClusterDiagStatusOnlinePartial - All members are reachable or part of the quorum
+	// - Some reachable members form a quorum between themselves
+	// - There may be members outside of the quorum in any state, but they must not form a quorum
+	// Note that there may be members that think are ONLINE, but minority in a view with UNREACHABLE members
+	ClusterDiagStatusOnlinePartial ClusterDiagStatusType = "ONLINE_PARTIAL"
+
+	// ClusterDiagStatusOffline - All members are reachable
+	// - All cluster members are OFFLINE/ERROR (or being deleted)
+	// - GTID set of all members are consistent
+	// We're sure that the cluster is completely down with no quorum hiding somewhere
+	// The cluster can be safely rebooted
+	ClusterDiagStatusOffline ClusterDiagStatusType = "OFFLINE"
+
+	// ClusterDiagStatusNoQuorum - All members are reachable
+	// - All cluster members are either OFFLINE/ERROR or ONLINE but with no quorum
+	// A split-brain with no-quorum still falls in this category
+	// The cluster can be safely restored
+	ClusterDiagStatusNoQuorum ClusterDiagStatusType = "NO_QUORUM"
+
+	// ClusterDiagStatusSplitBrain - Some but not all members are unreachable
+	// - There are multiple ONLINE/RECOVERING members forming a quorum, but with >1
+	// different views
+	// If some members are not reachable, they could either be forming more errant
+	// groups or be unavailable, but that doesn't make much dfifference.
+	ClusterDiagStatusSplitBrain ClusterDiagStatusType = "SPLIT_BRAIN"
+
+	// ClusterDiagStatusOnlineUncertain - Some members are unreachable
+	// - Reachable members form a quorum between themselves
+	// - There are unreachable members that are not in the quorum and have unknown state
+	// Because there are members with unknown state, the possibility that there's a
+	// split-brain exists.
+	ClusterDiagStatusOnlineUncertain ClusterDiagStatusType = "ONLINE_UNCERTAIN"
+
+	// ClusterDiagStatusOfflineUncertain - OFFLINE with unreachable members
+	ClusterDiagStatusOfflineUncertain ClusterDiagStatusType = "OFFLINE_UNCERTAIN"
+
+	// ClusterDiagStatusNoQuorumUncertain - NoQuorum with unreachable members
+	ClusterDiagStatusNoQuorumUncertain ClusterDiagStatusType = "NO_QUORUM_UNCERTAIN"
+
+	// ClusterDiagStatusSplitBrainUncertain - SplitBrain with unreachable members
+	ClusterDiagStatusSplitBrainUncertain ClusterDiagStatusType = "SPLIT_BRAIN_UNCERTAIN"
+
+	// ClusterDiagStatusUnknown - No reachable/connectable members
+	// We have no idea about the state of the cluster, so nothing can be done about it (even if we wanted)
+	ClusterDiagStatusUnknown ClusterDiagStatusType = "UNKNOWN"
+
+	// ClusterDiagStatusInitializing - Cluster is not marked as initialized in Kubernetes
+	// The cluster hasn't been created/initialized yet, so we can safely create it
+	ClusterDiagStatusInitializing ClusterDiagStatusType = "INITIALIZING"
+
+	// ClusterDiagStatusFinalizing - Cluster object is marked as being deleted
+	ClusterDiagStatusFinalizing ClusterDiagStatusType = "FINALIZING"
+
+	// ClusterDiagStatusInvalid - A (currently) undiagnosable and unrecoverable mess that doesn't fit any other state
+	ClusterDiagStatusInvalid ClusterDiagStatusType = "INVALID"
+
+	ClusterDiagStatusPending ClusterDiagStatusType = "PENDING"
+
+	ClusterDiagStatusFailed ClusterDiagStatusType = "FAILED"
 )
 
 type ConditionStatus string
@@ -74,6 +169,8 @@ const (
 	// GreatDBPaxosDeleting The cluster is Deleting at this stage
 	GreatDBPaxosTerminating GreatDBPaxosConditionType = "Terminating"
 
+	GreatDBPaxosRepair GreatDBPaxosConditionType = "Repair"
+
 	GreatDBPaxosPause GreatDBPaxosConditionType = "Pause"
 	// Restart
 	GreatDBPaxosRestart GreatDBPaxosConditionType = "Restart"
@@ -108,24 +205,19 @@ func (g GreatDBPaxosConditionType) Stage() int {
 type MemberConditionType string
 
 const (
-
-	// MemberStatusOnline Indicates that the member is functioning normally and is in a state that can accept read and write requests.
 	MemberStatusOnline MemberConditionType = "ONLINE"
 
-	// MemberStatusRecovering Indicates that a member is undergoing fault recovery and may be a newly added or re joined member of the group,
-	// obtaining data from other members to achieve consistency.
 	MemberStatusRecovering MemberConditionType = "RECOVERING"
+	MemberStatusError      MemberConditionType = "ERROR"
+	MemberStatusOffline    MemberConditionType = "OFFLINE"
 
-	// MemberStatusUnreachable Indicates that a member cannot communicate with other members in the group.
-	// This may be caused by network issues, host failures, or other reasons.
-	MemberStatusUnreachable MemberConditionType = "UNREACHABLE"
+	// Unmanaged - Instance of an unmanaged replication group. Probably was already member but got removed
+	MemberStatusUnmanaged MemberConditionType = "UNMANAGED"
 
-	// MemberStatusOffline Indicates that the member has taken the initiative to go offline and no longer participates in the operation of the group.
-	// Offline members will no longer receive or process read and write requests.
-	MemberStatusOffline MemberConditionType = "OFFLINE"
+	// Unknown - Uncertain because we can't connect or query it
+	MemberStatusUnknown MemberConditionType = "UNKNOWN"
 
-	// MemberStatusError Indicates that a member has encountered a serious error and is unable to function properly. Members need to be repaired or reconfigured.
-	MemberStatusError MemberConditionType = "ERROR"
+	MemberStatusReady MemberConditionType = "Ready"
 
 	// MemberStatusPending The instance is still starting
 	MemberStatusPending MemberConditionType = "Pending"
@@ -141,25 +233,11 @@ const (
 
 	// MemberStatusFailure  The member was changed to a failed state due to a long-term error
 	MemberStatusFailure MemberConditionType = "Failure"
-
-	// MemberStatusUnknown
-	MemberStatusUnknown MemberConditionType = "Unknown"
 )
 
 func (state MemberConditionType) Parse() MemberConditionType {
 
 	return state
-}
-
-func (state MemberConditionType) IsNormal() bool {
-
-	switch state {
-	case MemberStatusOffline, MemberStatusUnreachable, MemberStatusError:
-		return false
-	default:
-		return true
-	}
-
 }
 
 type MemberRoleType string

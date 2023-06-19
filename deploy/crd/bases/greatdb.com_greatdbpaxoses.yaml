@@ -1463,12 +1463,18 @@ spec:
                 description: Currently created instance
                 format: int32
                 type: integer
+              diagStatus:
+                description: The diag state of the cluster
+                type: string
               instances:
                 description: Number of GreatDB component desired instances
                 format: int32
                 type: integer
+              lastProbeTime:
+                format: date-time
+                type: string
               member:
-                description: Current service state of GreatDB instance.
+                description: Expect service state of GreatDB instance.
                 items:
                   description: GreatDBCondition  instance service state of GreatDB.
                   properties:
@@ -1481,6 +1487,9 @@ spec:
                       type: string
                     index:
                       type: integer
+                    joinCluster:
+                      description: Whether you have been added to a cluster
+                      type: boolean
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
                         to another.
