@@ -576,33 +576,25 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 	}
 
 	switch cluster.Status.Phase {
+	case v1alpha1.GreatDBPaxosSucceeded:
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 
 	case v1alpha1.GreatDBPaxosDeployDB:
-
-		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosDeployDB, "")
-		cluster.Status.Port = cluster.Spec.Port
-		cluster.Status.Instances = cluster.Spec.Instances
-		cluster.Status.TargetInstances = cluster.Spec.Instances
-		cluster.Status.CurrentInstances = cluster.Spec.Instances
-
 		if !diag.checkInstanceContainersIsReady() {
 			return nil
 		}
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosBootCluster, "")
 
 	case v1alpha1.GreatDBPaxosBootCluster:
-
 		if err := diag.createCluster(cluster); err != nil {
 			return err
 		}
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosInitUser, "")
-
 	case v1alpha1.GreatDBPaxosInitUser:
 		if err := diag.initUser(cluster); err != nil {
 			return err
 		}
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosSucceeded, "")
-
 	case v1alpha1.GreatDBPaxosReady:
 		// pause
 		if cluster.Spec.Pause.Enable && cluster.Spec.Pause.Mode == v1alpha1.ClusterPause {
@@ -634,6 +626,9 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 	case v1alpha1.GreatDBPaxosRepair:
 		if cluster.Status.ReadyInstances < cluster.Spec.Instances {
 			diag.repairCluster(cluster)
+		}
+		if cluster.Status.ReadyInstances == cluster.Spec.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
 	}
 

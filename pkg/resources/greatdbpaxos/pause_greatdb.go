@@ -13,7 +13,7 @@ func (great GreatDBManager) pauseGreatDB(cluster *v1alpha1.GreatDBPaxos, member 
 		cluster.Spec.Pause = &v1alpha1.PauseGreatDB{}
 	}
 
-	if !great.needPause(cluster, member) {
+	if !NeedPause(cluster, member) {
 		return false, nil
 	}
 
@@ -44,7 +44,7 @@ func (great GreatDBManager) pauseInstance(cluster *v1alpha1.GreatDBPaxos, member
 
 }
 
-func (GreatDBManager) needPause(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) bool {
+func NeedPause(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) bool {
 
 	if !cluster.Spec.Pause.Enable {
 		return false
