@@ -83,6 +83,11 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		}
 		return nil
 	}
+
+	if !needUpgrade && len(cluster.Status.UpgradeMember.Upgraded) > 0 {
+		cluster.Status.UpgradeMember.Upgraded[podIns.Name] = resources.GetNowTimeToString()
+	}
+
 	if great.upgradeClusterEnds(cluster) {
 		cluster.Status.UpgradeMember.Upgraded = make(map[string]string, 0)
 		cluster.Status.UpgradeMember.Upgrading = make(map[string]string, 0)

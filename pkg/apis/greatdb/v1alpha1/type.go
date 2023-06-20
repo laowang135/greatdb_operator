@@ -178,13 +178,13 @@ const (
 	// Upgrade
 	GreatDBPaxosUpgrade GreatDBPaxosConditionType = "Upgrade"
 	// GreatDBClusterScaleOut Greatdb is in the scale out phase
-	GreatDBClusterScaleOut GreatDBPaxosConditionType = "ScaleOut"
+	GreatDBPaxosScaleOut GreatDBPaxosConditionType = "ScaleOut"
 
 	// GreatDBClusterScaleOut Greatdb is in the scale in phase
-	GreatDBClusterScaleIn GreatDBPaxosConditionType = "ScaleIn"
+	GreatDBPaxosScaleIn GreatDBPaxosConditionType = "ScaleIn"
 
 	// Greatdb failed to expand and shrink instances
-	GreatDBClusterScaleFailed GreatDBPaxosConditionType = "ScaleFailed"
+	GreatDBPaxosScaleFailed GreatDBPaxosConditionType = "ScaleFailed"
 
 	// This stage indicates cluster deployment failure
 	GreatDBPaxosFailed GreatDBPaxosConditionType = "Failed"
@@ -274,4 +274,17 @@ const (
 
 	// FailOverCreateMember Instance created during failover
 	FailOverCreateMember MemberCreateType = "failover"
+)
+
+type ScaleInStrategyType string
+
+const (
+	// Reduce in reverse order based on index
+	ScaleInStrategyIndex ScaleInStrategyType = "index"
+
+	// Prioritize scaling down faulty nodes and then reduce them in reverse order based on index
+	ScaleInStrategyFault ScaleInStrategyType = "fault"
+
+	// Shrink the specified instance
+	ScaleInStrategyDefine ScaleInStrategyType = "define"
 )

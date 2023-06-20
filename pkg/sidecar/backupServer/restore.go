@@ -23,15 +23,15 @@ func downBackupFilesystem(cfg *Config, local bool) error {
 
 	for _, path := range cfg.BackupRecordFiles {
 		file := GetBackupFilePath(path)
-		downDir := GetBackupFileDownloadDir(path)
+		TargetDir := GetBackupFileDownloadDir(path)
 
-		err := os.MkdirAll(downDir, os.ModePerm)
+		err := os.MkdirAll(TargetDir, os.ModePerm)
 		if err != nil {
 			logger.Errorf("%v, failed to create restore backup dir", err)
 			return fmt.Errorf("create backup file failed")
 		}
 
-		param := strings.Join(cfg.XbstreamArgs(downDir), " ")
+		param := strings.Join(cfg.XbstreamArgs(TargetDir), " ")
 
 		cmd := fmt.Sprintf("curl -f %s | %s %s", cfg.BackupServerDownload(file, local), xbstreamCommand, param)
 
@@ -62,14 +62,14 @@ func localBackupNFS(cfg *Config) error {
 
 	for _, path := range cfg.BackupRecordFiles {
 		file := GetBackupFilePath(path)
-		downDir := GetBackupFileDownloadDir(path)
-		downFile := downDir + "/" + GreatdbBackupName
-		err := os.MkdirAll(downDir, os.ModePerm)
+		TargetDir := GetBackupFileDownloadDir(path)
+		SourcesFilePath := GetRestoreSourceFilePath(cfg.Namespace, file)
+		err := os.MkdirAll(TargetDir, os.ModePerm)
 		if err != nil {
 			logger.Errorf("%v, failed to create restore backup dir", err)
 			return fmt.Errorf("create backup file failed")
 		}
-		backupReader, err := os.Open(downFile)
+		backupReader, err := os.Open(SourcesFilePath)
 		if err != nil {
 			err = fmt.Errorf("failed to open backup stream file, %s", err.Error())
 			logger.Error(err.Error())
@@ -78,7 +78,7 @@ func localBackupNFS(cfg *Config) error {
 		defer backupReader.Close()
 
 		// unpack the backup
-		unpack := exec.Command(xbstreamCommand, cfg.XbstreamArgs(downDir)...)
+		unpack := exec.Command(xbstreamCommand, cfg.XbstreamArgs(TargetDir)...)
 		logger.Info(unpack.String())
 
 		unpack.Stdin = backupReader
@@ -129,7 +129,7 @@ func downBackupS3(cfg *Config) error {
 			return fmt.Errorf("create backup file failed")
 		}
 
-		// bucket 下载
+		// bucket download
 		mcDownload := exec.Command(mcCommand, "cp", s3File, downDir)
 
 		logger.Info(mcDownload.String())
@@ -251,7 +251,7 @@ func prepareDir() error {
 func RunRestore() error {
 
 	// Used to determine if it has been restored
-	restoreTagPath := strings.Join([]string{GreatdbDataMountPath, "restore"}, "/")
+	restoreTagPath := strings.Join([]string{GreatdbDataMountPath, "restore_successful"}, "/")
 
 	_, err := os.Stat(restoreTagPath)
 	if err == nil {

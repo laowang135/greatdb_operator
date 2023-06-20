@@ -312,10 +312,18 @@ func GetBackupFileDownloadDir(dir string) string {
 	return path.Join(GreatdbRestorePath, dir)
 }
 
+func GetNFSBackupFilePath(dir string) string {
+	return path.Join(GreatdbRestorePath, dir)
+}
+
 func GetBackupFileDownloadMCLog(dir string) string {
 	return path.Join(GreatdbRestorePath, dir) + "/mc.log"
 }
 
 func GetBackupFileDownloadMCErrorLog(dir string) string {
 	return path.Join(GreatdbRestorePath, dir) + "/mc_error.log"
+}
+
+func GetRestoreSourceFilePath(ns, file string) string {
+	return path.Join(GreatdbBackupDataMountPath, ns, file)
 }

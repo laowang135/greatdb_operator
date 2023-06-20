@@ -2,18 +2,19 @@ package greatdbpaxos
 
 import (
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/resources/internal"
 	dblog "greatdb-operator/pkg/utils/log"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/go-sql-driver/mysql"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type ClusterStatus struct {
@@ -364,6 +365,26 @@ func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.Gre
 	}
 
 	cs.publishInstanceStatus(cluster)
+
+	var normalInsNum int32
+	var failureInsNum int32
+	for _, member := range cluster.Status.Member {
+		switch member.Type {
+		case v1alpha1.MemberStatusError, v1alpha1.MemberStatusFailure, v1alpha1.MemberStatusOffline, v1alpha1.MemberStatusUnmanaged:
+			failureInsNum += 1
+		case v1alpha1.MemberStatusOnline, v1alpha1.MemberStatusRecovering:
+			normalInsNum += 1
+		case v1alpha1.MemberStatusPause:
+			if member.Role != "" {
+				failureInsNum += 1
+			}
+		}
+	}
+
+	cluster.Status.Instances = cluster.Spec.Instances
+	cluster.Status.ReadyInstances = normalInsNum
+	cluster.Status.AvailableReplicas = normalInsNum + failureInsNum
+	cluster.Status.Port = cluster.Spec.Port
 }
 
 func (diagnostic *ClusterStatus) repairCluster(cluster *v1alpha1.GreatDBPaxos) {

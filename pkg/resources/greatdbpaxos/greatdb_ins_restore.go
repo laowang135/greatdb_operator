@@ -23,22 +23,28 @@ func (great GreatDBManager) newGreatDBBackupContainers(backuprecord *v1alpha1.Gr
 
 	volumeMounts := []corev1.VolumeMount{
 		{ // backup
-			Name:      "backup-pvc",
+			Name:      resources.GreatdbPvcDataName,
 			MountPath: greatdbDataMountPath,
 		},
+	}
+	if *cluster.Spec.Backup.Enable && cluster.Spec.Backup.NFS != nil {
+		backupMounts := corev1.VolumeMount{
+			Name:      resources.GreatdbBackupPvcName,
+			MountPath: greatdbBackupMountPath,
+		}
+		volumeMounts = append(volumeMounts, backupMounts)
 	}
 
 	resource := corev1.ResourceRequirements{}
 	resource.Requests = make(corev1.ResourceList)
 	resource.Limits = make(corev1.ResourceList)
 
-	resource.Requests[corev1.ResourceCPU] = k8sresource.MustParse("2Gi")
-	resource.Limits[corev1.ResourceCPU] = cluster.Spec.Resources.Requests[corev1.ResourceCPU]
+	resource.Requests[corev1.ResourceCPU] = k8sresource.MustParse("2")
+	resource.Limits[corev1.ResourceCPU] = resource.Requests[corev1.ResourceCPU]
 	resource.Requests[corev1.ResourceMemory] = k8sresource.MustParse("2Gi")
-	resource.Limits[corev1.ResourceMemory] = cluster.Spec.Resources.Requests[corev1.ResourceMemory]
-
+	resource.Limits[corev1.ResourceMemory] = resource.Requests[corev1.ResourceMemory]
 	container = corev1.Container{
-		Name:            "greatdb-restore-job",
+		Name:            "greatdb-restore",
 		Env:             env,
 		Command:         []string{"greatdb-agent", "--mode=greatdb-restore"},
 		Image:           cluster.Spec.Image,
@@ -76,6 +82,15 @@ func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.Gr
 		{
 			Name:  "BackupStorage",
 			Value: string(backuprecord.Spec.SelectStorage.Type),
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
 		},
 	}
 
