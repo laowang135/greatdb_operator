@@ -75,7 +75,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 	// connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?interpolateParams=true&timeout=5s",
 	// 	user, pass, host, port, dbname)
 
-	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?interpolateParams=true&timeout=3s",
+	connStr := fmt.Sprintf("%s:%s@tcp(%s)/%s?timeout=3s",
 		user, pass, host, dbname)
 	db, err := sql.Open("mysql", connStr)
 
@@ -87,7 +87,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 	db.SetMaxIdleConns(5)
 	db.SetMaxOpenConns(10)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	if err = db.PingContext(ctx); err != nil {

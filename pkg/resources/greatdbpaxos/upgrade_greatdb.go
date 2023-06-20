@@ -2,6 +2,7 @@ package greatdbpaxos
 
 import (
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
+	"greatdb-operator/pkg/resources"
 	"strings"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 
 // pauseGreatdb Whether to pause the return instance
 func (great GreatDBManager) upgradeGreatDB(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {
-
 	if cluster.Status.Phase != v1alpha1.GreatDBPaxosReady && cluster.Status.Phase != v1alpha1.GreatDBPaxosUpgrade {
 		return nil
 	}
@@ -49,14 +49,21 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 				podIns.Spec.Containers[i].Image = cluster.Spec.Image
 				needUpgrade = true
 			}
-			break
+
+		}
+		if container.Name == GreatDBAgentContainerName {
+			if container.Image != cluster.Spec.Image {
+				podIns.Spec.Containers[i].Image = cluster.Spec.Image
+				needUpgrade = true
+			}
+
 		}
 	}
 
-	if value, ok := cluster.Status.UpgradeMember.Upgrading[podIns.Name]; ok {
+	if value, ok := cluster.Status.UpgradeMember.Upgrading[podIns.Name]; ok && !needUpgrade {
 		// Upgrading requires at least 30 seconds before continuing to determine
-		t := StringToTime(value)
-		if time.Now().Local().Sub(t) < time.Second*30 {
+		t := resources.StringToTime(value)
+		if resources.GetNowTime().Sub(t) < time.Second*30 {
 			return nil
 		}
 
@@ -64,8 +71,9 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
 				for _, member := range cluster.Status.Member {
 
-					if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline && t.Sub(member.LastTransitionTime.Time) < 0 {
-						cluster.Status.UpgradeMember.Upgraded[podIns.Name] = GetNowTime()
+					if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline &&
+						(t.Sub(member.LastTransitionTime.Time) < 0 || t.Sub(podIns.CreationTimestamp.Time) < 0) {
+						cluster.Status.UpgradeMember.Upgraded[podIns.Name] = resources.GetNowTimeToString()
 						delete(cluster.Status.UpgradeMember.Upgrading, podIns.Name)
 						break
 					}
@@ -98,22 +106,31 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		}
 
 	case v1alpha1.RollingUpgrade:
+
 		if len(cluster.Status.UpgradeMember.Upgrading) > 0 {
-			return nil
+			_, ok := cluster.Status.UpgradeMember.Upgrading[podIns.Name]
+			if !ok {
+				return nil
+			}
+
 		}
 		diag := great.ProbeStatus(cluster)
 		memberList := diag.OnlineMembers
 		canUpgrade := false
 		secondaryAllUpgrade := true
+		exist := false
 		for _, member := range memberList {
 			splitName := strings.Split(member.MemberHost, ".")
 			name := member.MemberHost
 			if len(splitName) > 0 {
 				name = splitName[0]
 			}
-			if name == podIns.Name && member.Role == string(v1alpha1.MemberRoleSecondary) {
-				canUpgrade = true
-				break
+			if name == podIns.Name {
+				exist = true
+				if member.Role != string(v1alpha1.MemberRolePrimary) {
+					canUpgrade = true
+					break
+				}
 			}
 
 			if member.Role == string(v1alpha1.MemberRoleSecondary) {
@@ -124,7 +141,7 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 
 		}
 
-		if !canUpgrade && !secondaryAllUpgrade {
+		if !canUpgrade && !secondaryAllUpgrade && exist {
 			return nil
 		}
 
@@ -134,7 +151,7 @@ func (great GreatDBManager) upgradeInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		}
 
 	}
-	cluster.Status.UpgradeMember.Upgrading[podIns.Name] = GetNowTime()
+	cluster.Status.UpgradeMember.Upgrading[podIns.Name] = resources.GetNowTimeToString()
 
 	return nil
 

@@ -85,6 +85,21 @@ type DeleteInstance struct {
 	CleanPvc bool `json:"cleanPvc,omitempty"`
 }
 
+type BackupSpec struct {
+	// Is the backup service enabled? If it is not enabled, even if a backup plan is created, it will not be backed up
+	// +optional
+	// +kubebuilder:default="true"
+	Enable *bool `json:"enable,omitempty"`
+
+	// Compute Resources required by this container. Cannot be updated
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+
+	// configuring nfs addresses for backup storage
+	// +optional
+	NFS *v1.NFSVolumeSource `json:"nfs,omitempty"`
+}
+
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
 type GreatDBPaxosSpec struct {
 	// set cluster affinity
@@ -195,7 +210,12 @@ type GreatDBPaxosSpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Set whether the main node is readable
+	// +optional
 	PrimaryReadable bool `json:"primaryReadable,omitempty"`
+
+	// configure backup support
+	// +optional
+	Backup BackupSpec `json:"backup,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.
@@ -392,6 +412,15 @@ type GreatDBPaxosList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []GreatDBPaxos `json:"items"`
+}
+
+func (g GreatDBPaxos) GetClusterDomain() string {
+
+	if g.Spec.ClusterDomain == "" {
+		return "cluster.local"
+	}
+
+	return g.Spec.ClusterDomain
 }
 
 func init() {

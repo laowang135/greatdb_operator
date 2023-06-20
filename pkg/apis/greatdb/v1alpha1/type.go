@@ -177,6 +177,15 @@ const (
 	GreatDBPaxosRestart GreatDBPaxosConditionType = "Restart"
 	// Upgrade
 	GreatDBPaxosUpgrade GreatDBPaxosConditionType = "Upgrade"
+	// GreatDBClusterScaleOut Greatdb is in the scale out phase
+	GreatDBClusterScaleOut GreatDBPaxosConditionType = "ScaleOut"
+
+	// GreatDBClusterScaleOut Greatdb is in the scale in phase
+	GreatDBClusterScaleIn GreatDBPaxosConditionType = "ScaleIn"
+
+	// Greatdb failed to expand and shrink instances
+	GreatDBClusterScaleFailed GreatDBPaxosConditionType = "ScaleFailed"
+
 	// This stage indicates cluster deployment failure
 	GreatDBPaxosFailed GreatDBPaxosConditionType = "Failed"
 

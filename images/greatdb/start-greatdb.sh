@@ -226,6 +226,7 @@ init_sql(){
 
 start_mysql() {
     echo "start "
+     rm -rf /greatdb/mysql/socket/*
     $mysql_server --defaults-file=/greatdb/mysql/conf/my.cnf &
 }
 
@@ -236,7 +237,7 @@ _main() {
         echo "Failed to start the database"
         exit 1
     fi
-    rm -rf /greatdb/mysql/socket/mysql.sock
+   
     start_mysql
     if [ "$?" != "0" ]; then
         echo "Failed to start the database"

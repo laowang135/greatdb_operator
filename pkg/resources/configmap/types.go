@@ -108,7 +108,7 @@ wait_timeout = 31536000
 
 loose-plugin_load_add = 'mysql_clone.so'
 loose-plugin_load_add = 'group_replication.so'
-loose-group_replication_group_name = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+loose-group_replication_group_name = "9a84d4d4-4fd4-43fd-804b-b94a112d74a9"
 
 loose-group_replication_ip_whitelist = '0.0.0.0/0'
 loose-group_replication_local_address = "GROUPLOCALADDRESS"
@@ -133,25 +133,27 @@ loose-group_replication_autorejoin_tries = 288
 )
 
 var GreatdbFixedOptions = map[string]bool{
-	"datadir":                             true,
-	"port":                                true,
-	"socket":                              true,
-	"mysqlx":                              true,
-	"mysqlx_port":                         true,
-	"mysqlx_socket":                       true,
-	"user":                                true,
-	"report_host":                         true,
-	"admin_address":                       true,
-	"admin_port":                          true,
-	"server_id":                           true,
-	"tmpdir":                              true,
-	"general_log_file":                    true,
-	"log_bin":                             true,
-	"relay_log":                           true,
-	"slow_query_log_file":                 true,
-	"log_error":                           true,
-	"pid_file":                            true,
-	"loose-group_replication_group_seeds": true,
+	"datadir":                              true,
+	"port":                                 true,
+	"socket":                               true,
+	"mysqlx":                               true,
+	"mysqlx_port":                          true,
+	"mysqlx_socket":                        true,
+	"user":                                 true,
+	"report_host":                          true,
+	"admin_address":                        true,
+	"admin_port":                           true,
+	"server_id":                            true,
+	"tmpdir":                               true,
+	"general_log_file":                     true,
+	"log_bin":                              true,
+	"relay_log":                            true,
+	"slow_query_log_file":                  true,
+	"log_error":                            true,
+	"pid_file":                             true,
+	"loose-group_replication_group_seeds":  true,
+	"loose-group_replication_ip_whitelist": true,
+	"oose-group_replication_local_address": true,
 }
 
 // https://dev.mysql.com/doc/refman/8.0/en/dynamic-system-variables.html
@@ -860,43 +862,4 @@ var GreatdbSupportDynamicOptions = map[string]string{
 	"wait_timeout":                                          "int",
 	"windowing_use_high_precision":                          "bool",
 	"xa_detach_on_prepare":                                  "bool",
-}
-
-var DBscaleSupportDynamicOptions = map[string]string{
-	"auto-purge-binlog":          "int",
-	"backend-sql-net-timeout":    "int",
-	"connection-timeout":         "int",
-	"check-master-sync":          "int",
-	"do-audit-log":               "string",
-	"enable-record-query-time":   "int",
-	"enable-read-only":           "int",
-	"encode-password":            "int",
-	"max-conn-execute-time":      "int",
-	"max-conn-limit":             "int",
-	"max-replication-delay":      "int",
-	"monitor-interval":           "int",
-	"monitor-method":             "int",
-	"monitor-net-timeout":        "int",
-	"monitor-retry-count-stable": "int",
-	"monitor-retry-gap-stable":   "int",
-	"real-time-queries":          "int",
-	"restrict-create-table":      "int",
-	"slow-query-time":            "int",
-	"wait-timeout":               "int",
-}
-
-var DBscaleFixedOptions = map[string]bool{
-	"zookeeper-host":        true,
-	"zookeeper-password":    true,
-	"admin-user":            true,
-	"cluster-user":          true,
-	"supreme-admin-user":    true,
-	"dbscale-internal-user": true,
-	"normal-admin-user":     true,
-	"admin-password":        true,
-	"cluster-password ":     true,
-	"log-file":              true,
-	"pid-file":              true,
-	"zk-log-file":           true,
-	"node-host-addr ":       true,
 }

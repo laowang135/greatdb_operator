@@ -17,6 +17,22 @@ limitations under the License.
 
 package v1alpha1
 
+// GreatDBBackupRecordListerExpansion allows custom methods to be added to
+// GreatDBBackupRecordLister.
+type GreatDBBackupRecordListerExpansion interface{}
+
+// GreatDBBackupRecordNamespaceListerExpansion allows custom methods to be added to
+// GreatDBBackupRecordNamespaceLister.
+type GreatDBBackupRecordNamespaceListerExpansion interface{}
+
+// GreatDBBackupScheduleListerExpansion allows custom methods to be added to
+// GreatDBBackupScheduleLister.
+type GreatDBBackupScheduleListerExpansion interface{}
+
+// GreatDBBackupScheduleNamespaceListerExpansion allows custom methods to be added to
+// GreatDBBackupScheduleNamespaceLister.
+type GreatDBBackupScheduleNamespaceListerExpansion interface{}
+
 // GreatDBPaxosListerExpansion allows custom methods to be added to
 // GreatDBPaxosLister.
 type GreatDBPaxosListerExpansion interface{}

@@ -22,9 +22,12 @@ const (
 const (
 	// greatdb
 	// The name of the greatdb mount configuration
-	greatdbConfigMountPath string = "/etc/greatdb/"
-	greatdbDataMountPath   string = "/greatdb/mysql/"
-	GreatDBContainerName          = "greatdb"
+	greatdbConfigMountPath    string = "/etc/greatdb/"
+	greatdbDataMountPath      string = "/greatdb/mysql/"
+	greatdbBackupMountPath    string = "/backup/"
+	GreatDBContainerName             = "greatdb"
+	GreatDBAgentContainerName        = "greatdb-agent"
+	BackupServerPort                 = 19999
 )
 
 // pvc

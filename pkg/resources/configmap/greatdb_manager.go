@@ -64,7 +64,7 @@ func (greatdb *greatdbConfigManager) Sync(cluster *v1alpha1.GreatDBPaxos) error 
 		return err
 	}
 
-	dblog.Log.Infof("Cluster %s/%s dbscale component configmap %s/%s sync succeeded", ns, clusterName, ns, configmapName)
+	dblog.Log.Infof("Cluster %s/%s  configmap %s/%s sync succeeded", ns, clusterName, ns, configmapName)
 	return nil
 }
 
@@ -316,10 +316,10 @@ func (greatdb greatdbConfigManager) updateConfigmapData(configmap *corev1.Config
 	}
 	var changeOptions = map[string]string{}
 	for newKey, newValue := range cluster.Spec.Config {
+		if _, ok := GreatdbFixedOptions[newKey]; ok {
+			continue
+		}
 		if _, ok := GreatdbSupportDynamicOptions[newKey]; ok {
-			if _, ok := GreatdbFixedOptions[newKey]; ok {
-				continue
-			}
 			oldValue, getErr := iniParse.GetKey("mysqld", newKey)
 			if getErr != nil {
 				dblog.Log.Errorf("Failed to add custom params, message: %s", err.Error())

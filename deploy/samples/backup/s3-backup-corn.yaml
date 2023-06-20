@@ -1,0 +1,18 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBBackupSchedule
+metadata:
+  name: s3-backup-corn
+spec:
+  clusterName: greatdb-sample
+  schedulers:
+  - name: test-s3
+    backupType: full
+    backupResource: greatdb
+    clean: "7d"
+    selectStorage:
+      type: s3
+      s3:
+        bucket: backup
+        endpointUrl: http://172.16.70.149:9000
+        accessKey: JM3sZ7ruaZHJvtYSrekz
+        secretKey: 4o4YwojsYCWNEtJBq2MCYEzK9LPA3DAzIgGDp2sU

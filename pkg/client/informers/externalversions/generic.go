@@ -52,6 +52,10 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=greatdb.com, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("greatdbbackuprecords"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatdb().V1alpha1().GreatDBBackupRecords().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("greatdbbackupschedules"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatdb().V1alpha1().GreatDBBackupSchedules().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("greatdbpaxoses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Greatdb().V1alpha1().GreatDBPaxoses().Informer()}, nil
 
