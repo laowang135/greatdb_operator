@@ -272,31 +272,6 @@ func (ctrl GreatDBClusterController) setDefault(cluster *gcv1alpha1.GreatDBPaxos
 // updateCluster Synchronize the cluster state to the desired state
 func (ctrl *GreatDBClusterController) syncCluster(cluster *gcv1alpha1.GreatDBPaxos) (err error) {
 
-	if cluster.Status.Phase == "" {
-		if cluster.Status.Conditions == nil {
-			cluster.Status.Conditions = make([]gcv1alpha1.GreatDBPaxosConditions, 0)
-		}
-		cluster.Status.Phase = gcv1alpha1.GreatDBPaxosPending
-		now := metav1.Now()
-		cluster.Status.Conditions = append(cluster.Status.Conditions, gcv1alpha1.GreatDBPaxosConditions{
-			Type:               gcv1alpha1.GreatDBPaxosPending,
-			Status:             gcv1alpha1.ConditionTrue,
-			Message:            "",
-			LastUpdateTime:     now,
-			LastTransitionTime: now,
-		})
-	}
-
-	if !cluster.DeletionTimestamp.IsZero() {
-		cluster.Status.Phase = gcv1alpha1.GreatDBPaxosTerminating
-		cluster.Status.Status = ""
-
-		err = ctrl.updateGreatDBClusterStatus(cluster)
-		if err != nil {
-			dblog.Log.Error(err.Error())
-		}
-	}
-
 	// synchronize cluster secret
 	if err = ctrl.managers.Secret.Sync(cluster); err != nil {
 		dblog.Log.Errorf("Failed to synchronize secret, message: %s ", err.Error())

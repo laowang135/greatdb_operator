@@ -304,9 +304,9 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 					break
 				}
 			}
-			//if NeedPause(cluster, member) {
-			//	cluster.Status.Member[i].Type = v1alpha1.MemberStatusPause
-			//}
+			if NeedPause(cluster, member) {
+				cluster.Status.Member[i].Type = v1alpha1.MemberStatusPause
+			}
 			now := metav1.Now()
 			cluster.Status.LastProbeTime = now
 			cluster.Status.Member[i].Role = v1alpha1.MemberRoleType(ins.Role).Parse()
@@ -324,34 +324,41 @@ func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.Gre
 	// 同步集群状态
 	clusterStatus := v1alpha1.ClusterStatusFailed
 	switch diag.status {
-	case v1alpha1.ClusterDiagStatusInitializing, v1alpha1.ClusterDiagStatusPending, v1alpha1.ClusterDiagStatusFailed:
+	case v1alpha1.ClusterDiagStatusInitializing:
+		cluster.Status.Port = cluster.Spec.Port
+		cluster.Status.Instances = cluster.Spec.Instances
+		cluster.Status.TargetInstances = cluster.Spec.Instances
+		cluster.Status.CurrentInstances = cluster.Spec.Instances
+		cluster.Status.Version = cluster.Spec.Version
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosDeployDB, "")
+		clusterStatus = v1alpha1.ClusterStatusInitializing
+	case v1alpha1.ClusterDiagStatusFinalizing:
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosTerminating, "")
+		clusterStatus = v1alpha1.ClusterStatusFinalizing
+	case v1alpha1.ClusterDiagStatusPending, v1alpha1.ClusterDiagStatusFailed:
 		clusterStatus = v1alpha1.ClusterStatusType(diag.status)
 	case v1alpha1.ClusterDiagStatusOnline, v1alpha1.ClusterDiagStatusOnlinePartial, v1alpha1.ClusterDiagStatusOnlineUncertain:
 		clusterStatus = v1alpha1.ClusterStatusOnline
+		if cluster.Status.Version != diag.primary.MemberVersion {
+			cluster.Status.Version = diag.primary.MemberVersion
+		}
+	case v1alpha1.ClusterDiagStatusOffline, v1alpha1.ClusterDiagStatusNoQuorum:
+		clusterStatus = v1alpha1.ClusterStatusOffline
 	}
 
+	if cluster.Status.Status == v1alpha1.ClusterStatusInitializing && clusterStatus != v1alpha1.ClusterStatusOnline {
+		clusterStatus = v1alpha1.ClusterStatusInitializing
+	}
 	if cluster.Status.DiagStatus != v1alpha1.ClusterDiagStatusPending {
 		if cluster.Status.Status != clusterStatus {
 			cluster.Status.Status = clusterStatus
 		}
+		cluster.Status.DiagStatus = diag.status
 	}
 
 	cluster.Status.ReadyInstances = int32(len(diag.OnlineMembers))
 	cluster.Status.AvailableReplicas = int32(len(diag.AllInstance))
 
-	switch cluster.Status.Phase {
-	case v1alpha1.GreatDBPaxosPending, v1alpha1.GreatDBPaxosDeployDB, v1alpha1.GreatDBPaxosBootCluster,
-		v1alpha1.GreatDBPaxosInitUser:
-		cluster.Status.DiagStatus = v1alpha1.ClusterDiagStatusInitializing
-	case v1alpha1.GreatDBPaxosSucceeded, v1alpha1.GreatDBPaxosReady, v1alpha1.GreatDBPaxosRepair, v1alpha1.GreatDBPaxosUpgrade:
-		if cluster.Status.ReadyInstances == cluster.Spec.Instances {
-			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
-		}
-	case v1alpha1.GreatDBPaxosFailed:
-		// TODO: Nothing to do??
-	case v1alpha1.GreatDBPaxosPause:
-		cluster.Status.Status = ""
-	}
 	if cluster.Status.Conditions == nil {
 		cluster.Status.Conditions = make([]v1alpha1.GreatDBPaxosConditions, 0)
 	}
@@ -827,14 +834,12 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 	clusterStatus := ClusterStatus{}
 
 	if cluster.Status.DiagStatus == "" && cluster.DeletionTimestamp.IsZero() {
-		clusterStatus.status = v1alpha1.ClusterDiagStatusPending
-		cluster.Status.Phase = v1alpha1.GreatDBPaxosDeployDB
+		clusterStatus.status = v1alpha1.ClusterDiagStatusInitializing
 		return clusterStatus
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
 		clusterStatus.status = v1alpha1.ClusterDiagStatusFinalizing
-		cluster.Status.Phase = v1alpha1.GreatDBPaxosTerminating
 		return clusterStatus
 	}
 
@@ -960,9 +965,9 @@ func (great GreatDBManager) probeStatusIfNeeded(cluster *v1alpha1.GreatDBPaxos) 
 
 func (great GreatDBManager) ProbeStatus(cluster *v1alpha1.GreatDBPaxos) ClusterStatus {
 	diag := DiagnoseCluster(cluster, great.Lister)
-
-	if cluster.DeletionTimestamp.IsZero() {
+	if diag.status != v1alpha1.ClusterDiagStatusFinalizing {
 		diag.publishStatus(diag, cluster)
 	}
+
 	return diag
 }

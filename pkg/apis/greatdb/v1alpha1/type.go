@@ -60,6 +60,7 @@ const (
 	ClusterStatusOffline      ClusterStatusType = "OFFLINE"
 	ClusterStatusInitializing ClusterStatusType = "INITIALIZING"
 	ClusterStatusPending      ClusterStatusType = "PENDING"
+	ClusterStatusFinalizing   ClusterStatusType = "FINALIZING"
 	ClusterStatusFailed       ClusterStatusType = "FAILED"
 )
 
