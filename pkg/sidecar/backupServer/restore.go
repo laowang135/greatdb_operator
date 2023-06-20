@@ -283,7 +283,6 @@ func RunRestore() error {
 	// mark recovery complete
 	file, err := os.Create(restoreTagPath)
 	if err == nil {
-		file.Write([]byte("1"))
 		file.Close()
 	}
 

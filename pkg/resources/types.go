@@ -31,13 +31,13 @@ var (
 )
 
 type MembershipInfo struct {
-	MemberId             string `json:member_id,omitempty`
-	ViewID               string `json:view_id,omitempty`
-	MemberRole           string `json:member_role,omitempty`
-	MemberState          string `json:member_state,omitempty`
-	MemberVersion        string `json:member_version,omitempty`
-	MemberCount          int32  `json:member_count,omitempty`
-	ReachableMemberCount int32  `json:reachable_member_count,omitempty`
+	MemberId             string `json:"member_id,omitempty"`
+	ViewID               string `json:"view_id,omitempty"`
+	MemberRole           string `json:"member_role,omitempty"`
+	MemberState          string `json:"member_state,omitempty"`
+	MemberVersion        string `json:"member_version,omitempty"`
+	MemberCount          int32  `json:"member_count,omitempty"`
+	ReachableMemberCount int32  `json:"reachable_member_count,omitempty"`
 }
 
 // label

@@ -887,7 +887,7 @@ spec:
                 description: configure backup support
                 properties:
                   enable:
-                    default: "true"
+                    default: true
                     description: Is the backup service enabled? If it is not enabled,
                       even if a backup plan is created, it will not be backed up
                     type: boolean
@@ -1257,6 +1257,31 @@ spec:
                     - all
                     type: string
                 type: object
+              scaling:
+                description: Expansion and contraction configuration
+                properties:
+                  scaleIn:
+                    description: Shrinkage configuration
+                    properties:
+                      instance:
+                        description: Effective only when the policy is defined
+                        items:
+                          type: string
+                        type: array
+                      strategy:
+                        default: fault
+                        description: 'Shrinkage strategy,Default fault index: Reduce
+                          in reverse order based on index fault: Prioritize scaling
+                          down faulty nodes and then reduce them in reverse order
+                          based on index define: Shrink the instance specified in
+                          the instance field'
+                        enum:
+                        - index
+                        - fault
+                        - define
+                        type: string
+                    type: object
+                type: object
               secretName:
                 description: SecretName is used to configure cluster account password
                   authentication
@@ -1530,7 +1555,7 @@ spec:
                 format: date-time
                 type: string
               member:
-                description: Expect service state of GreatDB instance.
+                description: Current service state of GreatDB instance.
                 items:
                   description: GreatDBCondition  instance service state of GreatDB.
                   properties:
@@ -1605,6 +1630,9 @@ spec:
                     description: Restarting an instance
                     type: object
                 type: object
+              scaleInMember:
+                description: Members currently undergoing resizing
+                type: string
               status:
                 description: The state of the cluster
                 type: string

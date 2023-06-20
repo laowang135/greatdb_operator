@@ -12,14 +12,14 @@ import (
 )
 
 var (
-	address = flag.String("address", GetStrEnvDefault("SERVER_ADDRESS", "0.0.0.0"), "The server listen address")
-	port    = flag.Int("port", GetIntEnvDefault("SERVER_PORT", 19999), "The server port, default: 19999")
-	mode    = flag.String("mode", GetStrEnvDefault("SERVER_MODE", "server"), "The dbinit run mode {backup restore server upload download}. default server mode.")
+	// address = flag.String("address", GetStrEnvDefault("SERVER_ADDRESS", "0.0.0.0"), "The server listen address")
+	// port    = flag.Int("port", GetIntEnvDefault("SERVER_PORT", 19999), "The server port, default: 19999")
+	mode = flag.String("mode", GetStrEnvDefault("SERVER_MODE", "server"), "The dbinit run mode {backup restore server upload download}. default server mode.")
 
-	fileName     = flag.String("file", GetStrEnvDefault("TRAN_FILENAME", ""), "Upload or download file name.")
-	uploadPath   = flag.String("uploadPath", GetStrEnvDefault("UPLOAD_PATH", ""), "uploadPath.")
-	downloadPath = flag.String("downloadPath", GetStrEnvDefault("DOWNLOAD_PATH", ""), "downloadPath.")
-	chunkSize    = flag.Int("chunk", GetIntEnvDefault("TRAN_CHUNK_SIZE", 4096), "Transport block chunk size")
+	// fileName     = flag.String("file", GetStrEnvDefault("TRAN_FILENAME", ""), "Upload or download file name.")
+	// uploadPath   = flag.String("uploadPath", GetStrEnvDefault("UPLOAD_PATH", ""), "uploadPath.")
+	// downloadPath = flag.String("downloadPath", GetStrEnvDefault("DOWNLOAD_PATH", ""), "downloadPath.")
+	// chunkSize    = flag.Int("chunk", GetIntEnvDefault("TRAN_CHUNK_SIZE", 4096), "Transport block chunk size")
 
 	log = dblog.Log
 )

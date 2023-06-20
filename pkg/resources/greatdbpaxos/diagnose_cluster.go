@@ -516,7 +516,7 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 		if !instance.InQuorum {
 			partRes := activePartitionWith(address)
 			if partRes == nil {
-				dblog.Log.Errorf("Inconsistent group view, %s not expected to be in %s", address, partRes)
+				dblog.Log.Errorf("inconsistent group view, %s not expected to be in %v", address, partRes)
 				return activePartitions, blockedPartitions
 			}
 
@@ -557,15 +557,15 @@ type InstanceStatus struct {
 	InQuorum             bool
 	Peers                map[string]string
 	gtidUnion            string
-	MemberHost           string                       `json:member_host,omitempty`
-	MemberPort           string                       `json:member_port,omitempty`
-	ViewID               string                       `json:view_id,omitempty`
-	Role                 string                       `json:member_role,omitempty`
-	State                v1alpha1.MemberConditionType `json:member_state,omitempty`
-	MemberId             string                       `json:member_id,omitempty`
-	MemberVersion        string                       `json:member_version,omitempty`
-	MemberCount          int32                        `json:member_count,omitempty`
-	ReachableMemberCount int32                        `json:reachable_member_count,omitempty`
+	MemberHost           string                       `json:"member_host,omitempty"`
+	MemberPort           string                       `json:"member_port,omitempty"`
+	ViewID               string                       `json:"view_id,omitempty"`
+	Role                 string                       `json:"member_role,omitempty"`
+	State                v1alpha1.MemberConditionType `json:"member_state,omitempty"`
+	MemberId             string                       `json:"member_id,omitempty"`
+	MemberVersion        string                       `json:"member_version,omitempty"`
+	MemberCount          int32                        `json:"member_count,omitempty"`
+	ReachableMemberCount int32                        `json:"reachable_member_count,omitempty"`
 }
 
 func (is *InstanceStatus) getInstanceConnect(cluster *v1alpha1.GreatDBPaxos) (internal.DBClientinterface, error) {
@@ -749,7 +749,7 @@ func diagnoseInstance(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) (Instance
 		if internal.CR_MAX_ERROR >= is.ConnectErrorCode && is.ConnectErrorCode >= internal.CR_MIN_ERROR {
 			// client side errors mean we can't connect to the server, but the
 			// problem could be in the client or network and not the server
-			dblog.Log.Warningf("%s: pod.phase=%s, deleting=%s", is.PodIns.Spec.Hostname, is.PodIns.Status.Phase, !is.PodIns.DeletionTimestamp.IsZero())
+			dblog.Log.Warningf("%s: pod.phase=%s, deleting=%t", is.PodIns.Spec.Hostname, is.PodIns.Status.Phase, !is.PodIns.DeletionTimestamp.IsZero())
 
 			if is.PodIns.Status.Phase != "Running" || is.checkContainersReady() || is.PodIns.DeletionTimestamp.IsZero() {
 				// not ONLINE for sure if the Pod is not running
@@ -903,7 +903,7 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 
 	if len(onlinePods) > 0 {
 		activePartitions, blockedPartitions := findGroupPartitions(onlineMemberStatuses, onlineMemberAddress)
-		dblog.Log.Infof("active_partitions=%s  blocked_partitions=%s", activePartitions, blockedPartitions)
+		dblog.Log.Infof("active_partitions=%v  blocked_partitions=%v", activePartitions, blockedPartitions)
 		if len(activePartitions) == 0 {
 			if len(unsurePods) > 0 {
 				clusterStatus.status = v1alpha1.ClusterDiagStatusNoQuorumUncertain
