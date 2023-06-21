@@ -284,7 +284,10 @@ func (client *defaultDBClient) GetTableData(query string) ([]map[string]interfac
 		for i := 0; i < count; i++ {
 			valuePtrs[i] = &values[i]
 		}
-		rows.Scan(valuePtrs...)
+		err := rows.Scan(valuePtrs...)
+		if err != nil {
+			return nil, err
+		}
 		entry := make(map[string]interface{})
 		for i, col := range columns {
 			var v interface{}

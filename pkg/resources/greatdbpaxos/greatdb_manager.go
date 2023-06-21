@@ -759,7 +759,7 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			break
 		}
 
-		if cluster.Status.ReadyInstances < cluster.Spec.Instances {
+		if cluster.Status.ReadyInstances == 0 {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRepair, "")
 		}
 
@@ -793,6 +793,10 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 		if cluster.Status.TargetInstances == cluster.Status.CurrentInstances && cluster.Status.ReadyInstances == cluster.Status.Instances {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
+	}
+
+	if cluster.Status.ReadyInstances < cluster.Status.Instances {
+		diag.repairCluster(cluster)
 	}
 
 	return nil

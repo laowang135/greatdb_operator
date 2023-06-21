@@ -106,7 +106,7 @@ func GetInstanceFQDN(clusterName, insName, ns, clusterDomain string) string {
 	d := strings.Split(insName, "-")
 	no, err := strconv.Atoi(d[len(d)-1])
 	if err == nil {
-		return fmt.Sprintf("172.17.120.140:%d", 30010+no)
+		return fmt.Sprintf("172.17.120.142:%d", 30010+no)
 	}
 
 	svcName := clusterName + ComponentGreatDBSuffix
