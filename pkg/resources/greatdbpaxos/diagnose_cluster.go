@@ -2,18 +2,20 @@ package greatdbpaxos
 
 import (
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/resources/internal"
 	dblog "greatdb-operator/pkg/utils/log"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/go-sql-driver/mysql"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type ClusterStatus struct {
@@ -56,6 +58,9 @@ func (cs *ClusterStatus) createCluster(cluster *v1alpha1.GreatDBPaxos) error {
 	is := cs.AllInstance[0]
 	dblog.Log.Infof("Creating cluster %s from pod %s...", cluster.Name, is.PodIns.Name)
 	err := cs.bootCluster(cluster, is)
+	if err != nil {
+		return err
+	}
 
 	// rejoin other Instance
 	for _, ins := range cs.AllInstance {
@@ -121,7 +126,7 @@ func (cs *ClusterStatus) bootCluster(cluster *v1alpha1.GreatDBPaxos, is Instance
 		if err != nil {
 			dblog.Log.Reason(err).Errorf("Failed to execute SQL statement %s.%s", cluster.Name, is.PodIns.Name)
 			if i == 1 {
-				client.Exec(startGRSql[2])
+				client.Exec(startGRSql[3])
 			}
 			return err
 		}
@@ -284,12 +289,28 @@ func (cs *ClusterStatus) checkInstanceContainersIsReady() bool {
 
 func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 
+	now := metav1.Now()
 	for i, member := range cluster.Status.Member {
-		for _, ins := range cs.AllInstance {
+
+		if NeedPause(cluster, member) {
+			cluster.Status.Member[i].Type = v1alpha1.MemberStatusPause
+			cluster.Status.Member[i].LastUpdateTime = now
+			cluster.Status.Member[i].LastTransitionTime = now
+			continue
+		}
+
+		exist := false
+		var pod *corev1.Pod
+		var ins InstanceStatus
+		for _, ins = range cs.AllInstance {
 			if ins.PodIns.Name != member.Name {
 				continue
 			}
-			pod := ins.PodIns
+			exist = true
+			pod = ins.PodIns
+			break
+		}
+		if exist {
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
 					cluster.Status.Member[i].Type = v1alpha1.MemberStatusFree
@@ -304,19 +325,30 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 					break
 				}
 			}
-			if NeedPause(cluster, member) {
-				cluster.Status.Member[i].Type = v1alpha1.MemberStatusPause
-			}
-			now := metav1.Now()
-			cluster.Status.LastProbeTime = now
-			cluster.Status.Member[i].Role = v1alpha1.MemberRoleType(ins.Role).Parse()
-			cluster.Status.Member[i].LastUpdateTime = now
-			cluster.Status.Member[i].LastTransitionTime = now
-			cluster.Status.Member[i].Version = ins.MemberVersion
-			if ins.State == v1alpha1.MemberStatusOnline {
-				cluster.Status.Member[i].JoinCluster = true
-			}
+		} else {
+			ins.MemberVersion = cluster.Status.Version
+			ins.State = v1alpha1.MemberStatusUnknown
 		}
+
+		if ins.State == v1alpha1.MemberStatusOnline {
+			cluster.Status.Member[i].JoinCluster = true
+		}
+
+		// Same status, only update time
+		if cluster.Status.Member[i].Type == ins.State && string(member.Role) == ins.Role {
+			if now.Sub(cluster.Status.Member[i].LastUpdateTime.Time) > time.Second*20 {
+				cluster.Status.Member[i].LastUpdateTime = now
+			}
+			continue
+		}
+
+		cluster.Status.LastProbeTime = now
+		cluster.Status.Member[i].Role = v1alpha1.MemberRoleType(ins.Role).Parse()
+		cluster.Status.Member[i].LastUpdateTime = now
+		cluster.Status.Member[i].LastTransitionTime = now
+		cluster.Status.Member[i].Version = ins.MemberVersion
+		cluster.Status.Member[i].Type = ins.State
+
 	}
 }
 
@@ -364,6 +396,26 @@ func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.Gre
 	}
 
 	cs.publishInstanceStatus(cluster)
+
+	var normalInsNum int32
+	var failureInsNum int32
+	for _, member := range cluster.Status.Member {
+		switch member.Type {
+		case v1alpha1.MemberStatusError, v1alpha1.MemberStatusFailure, v1alpha1.MemberStatusOffline, v1alpha1.MemberStatusUnmanaged:
+			failureInsNum += 1
+		case v1alpha1.MemberStatusOnline, v1alpha1.MemberStatusRecovering:
+			normalInsNum += 1
+		case v1alpha1.MemberStatusPause:
+			if member.Role != "" {
+				failureInsNum += 1
+			}
+		}
+	}
+
+	cluster.Status.Instances = cluster.Spec.Instances
+	cluster.Status.ReadyInstances = normalInsNum
+	cluster.Status.AvailableReplicas = normalInsNum + failureInsNum
+	cluster.Status.Port = cluster.Spec.Port
 }
 
 func (diagnostic *ClusterStatus) repairCluster(cluster *v1alpha1.GreatDBPaxos) {
@@ -495,7 +547,7 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 		if !instance.InQuorum {
 			partRes := activePartitionWith(address)
 			if partRes == nil {
-				dblog.Log.Errorf("Inconsistent group view, %s not expected to be in %s", address, partRes)
+				dblog.Log.Errorf("inconsistent group view, %s not expected to be in %v", address, partRes)
 				return activePartitions, blockedPartitions
 			}
 
@@ -536,15 +588,15 @@ type InstanceStatus struct {
 	InQuorum             bool
 	Peers                map[string]string
 	gtidUnion            string
-	MemberHost           string                       `json:member_host,omitempty`
-	MemberPort           string                       `json:member_port,omitempty`
-	ViewID               string                       `json:view_id,omitempty`
-	Role                 string                       `json:member_role,omitempty`
-	State                v1alpha1.MemberConditionType `json:member_state,omitempty`
-	MemberId             string                       `json:member_id,omitempty`
-	MemberVersion        string                       `json:member_version,omitempty`
-	MemberCount          int32                        `json:member_count,omitempty`
-	ReachableMemberCount int32                        `json:reachable_member_count,omitempty`
+	MemberHost           string                       `json:"member_host,omitempty"`
+	MemberPort           string                       `json:"member_port,omitempty"`
+	ViewID               string                       `json:"view_id,omitempty"`
+	Role                 string                       `json:"member_role,omitempty"`
+	State                v1alpha1.MemberConditionType `json:"member_state,omitempty"`
+	MemberId             string                       `json:"member_id,omitempty"`
+	MemberVersion        string                       `json:"member_version,omitempty"`
+	MemberCount          int32                        `json:"member_count,omitempty"`
+	ReachableMemberCount int32                        `json:"reachable_member_count,omitempty"`
 }
 
 func (is *InstanceStatus) getInstanceConnect(cluster *v1alpha1.GreatDBPaxos) (internal.DBClientinterface, error) {
@@ -603,7 +655,6 @@ func (is *InstanceStatus) QueryMembershipInfo(client internal.DBClientinterface)
 		}
 	}
 
-	return
 }
 
 func (is *InstanceStatus) checkErrantGtids(cluster *v1alpha1.GreatDBPaxos) (string, error) {
@@ -647,7 +698,6 @@ func (is *InstanceStatus) getGtidUnion(client internal.DBClientinterface, cluste
 		dblog.Log.Reason(err).Errorf("failed to exec sql: %s", gtidExecutedSql)
 		return ""
 	}
-	fmt.Println("Gtid Executed:", gtidExecuted)
 
 	receiveGtidSql := "select received_transaction_set from performance_schema.replication_connection_status where channel_name=\"group_replication_applier\";"
 	var receiveGtid string
@@ -656,7 +706,6 @@ func (is *InstanceStatus) getGtidUnion(client internal.DBClientinterface, cluste
 		dblog.Log.Reason(err).Errorf("failed to exec sql: %s", receiveGtidSql)
 		return ""
 	}
-	fmt.Println("Gtid Receive:", receiveGtid)
 
 	gtidUnionSql := fmt.Sprintf("select gtid_union(\"%s\", \"%s\")", gtidExecuted, receiveGtid)
 	var gtidUnion string
@@ -692,8 +741,6 @@ func (is *InstanceStatus) getGtidUnion(client internal.DBClientinterface, cluste
 
 	if err != nil {
 		dblog.Log.Reason(err).Errorf("failed to exec sql: %s", gtidUnionSql)
-	} else {
-		fmt.Println("Gtid Union:", gtidUnion)
 	}
 	return gtidUnion
 }
@@ -728,7 +775,7 @@ func diagnoseInstance(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) (Instance
 		if internal.CR_MAX_ERROR >= is.ConnectErrorCode && is.ConnectErrorCode >= internal.CR_MIN_ERROR {
 			// client side errors mean we can't connect to the server, but the
 			// problem could be in the client or network and not the server
-			dblog.Log.Warningf("%s: pod.phase=%s, deleting=%s", is.PodIns.Spec.Hostname, is.PodIns.Status.Phase, !is.PodIns.DeletionTimestamp.IsZero())
+			dblog.Log.Warningf("%s: pod.phase=%s, deleting=%t", is.PodIns.Spec.Hostname, is.PodIns.Status.Phase, !is.PodIns.DeletionTimestamp.IsZero())
 
 			if is.PodIns.Status.Phase != "Running" || is.checkContainersReady() || is.PodIns.DeletionTimestamp.IsZero() {
 				// not ONLINE for sure if the Pod is not running
@@ -780,7 +827,7 @@ func DiagnoseClusterCandidate(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) C
 	} else if is.State == v1alpha1.MemberStatusUnmanaged {
 		//check_errant_gtids
 
-		status.badGtidSet, err = is.checkErrantGtids(cluster)
+		status.badGtidSet, _ = is.checkErrantGtids(cluster)
 		if status.badGtidSet == "" {
 			status.state = v1alpha1.CandidateDiagStatusJoinable
 		} else {
@@ -797,7 +844,8 @@ func DiagnoseClusterCandidate(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) C
 			fatalError = ""
 		}
 
-		status.badGtidSet, err = is.checkErrantGtids(cluster)
+		status.badGtidSet, _ = is.checkErrantGtids(cluster)
+
 		if status.badGtidSet != "" {
 			dblog.Log.Warningf("%s has errant transactions relative to the cluster: errant_gtids={%s}", pod.Name, status.badGtidSet)
 		}
@@ -843,7 +891,7 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 		return clusterStatus
 	}
 
-	allMemberPods := make([]v1alpha1.MemberCondition, 0)
+	// allMemberPods := make([]v1alpha1.MemberCondition, 0)
 	onlinePods := make([]v1alpha1.MemberCondition, 0)
 	offlinePods := make([]v1alpha1.MemberCondition, 0)
 	unsurePods := make([]v1alpha1.MemberCondition, 0)
@@ -865,7 +913,7 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 			continue
 		}
 		gtidExecuted[pod.UID] = instanceStatus.gtidUnion
-		allMemberPods = append(allMemberPods, member)
+		// allMemberPods = append(allMemberPods, member)
 		onlineMemberAddress = append(onlineMemberAddress, member.Address)
 		if instanceStatus.State == v1alpha1.MemberStatusUnknown {
 			unsurePods = append(unsurePods, member)
@@ -882,7 +930,7 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 
 	if len(onlinePods) > 0 {
 		activePartitions, blockedPartitions := findGroupPartitions(onlineMemberStatuses, onlineMemberAddress)
-		dblog.Log.Infof("active_partitions=%s  blocked_partitions=%s", activePartitions, blockedPartitions)
+
 		if len(activePartitions) == 0 {
 			if len(unsurePods) > 0 {
 				clusterStatus.status = v1alpha1.ClusterDiagStatusNoQuorumUncertain
@@ -917,9 +965,8 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 			}
 			clusterStatus.OnlineMembers = make([]InstanceStatus, 0)
 			for _, part := range activePartitions {
-				for _, p := range part {
-					clusterStatus.OnlineMembers = append(clusterStatus.OnlineMembers, p)
-				}
+				clusterStatus.OnlineMembers = append(clusterStatus.OnlineMembers, part...)
+
 			}
 		}
 	} else {

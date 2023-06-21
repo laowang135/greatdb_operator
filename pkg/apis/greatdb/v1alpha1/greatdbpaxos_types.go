@@ -85,6 +85,40 @@ type DeleteInstance struct {
 	CleanPvc bool `json:"cleanPvc,omitempty"`
 }
 
+type BackupSpec struct {
+	// Is the backup service enabled? If it is not enabled, even if a backup plan is created, it will not be backed up
+	// +optional
+	// +kubebuilder:default=true
+	Enable *bool `json:"enable,omitempty"`
+
+	// Compute Resources required by this container. Cannot be updated
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+
+	// configuring nfs addresses for backup storage
+	// +optional
+	NFS *v1.NFSVolumeSource `json:"nfs,omitempty"`
+}
+
+type Scaling struct {
+
+	// Shrinkage configuration
+	// +optional
+	ScaleIn ScaleIn `json:"scaleIn,omitempty"`
+}
+
+type ScaleIn struct {
+	// Shrinkage strategy,Default fault
+	//index: Reduce in reverse order based on index
+	//fault: Prioritize scaling down faulty nodes and then reduce them in reverse order based on index
+	//define: Shrink the instance specified in the instance field
+	// +kubebuilder:default="fault"
+	// +kubebuilder:validation:Enum="index";"fault";"define"
+	Strategy ScaleInStrategyType `json:"strategy,omitempty"`
+	// Effective only when the policy is defined
+	Instance []string `json:"instance,omitempty"`
+}
+
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
 type GreatDBPaxosSpec struct {
 	// set cluster affinity
@@ -195,7 +229,16 @@ type GreatDBPaxosSpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Set whether the main node is readable
+	// +optional
 	PrimaryReadable bool `json:"primaryReadable,omitempty"`
+
+	// configure backup support
+	// +optional
+	Backup BackupSpec `json:"backup,omitempty"`
+
+	// Expansion and contraction configuration
+	// +optional
+	Scaling *Scaling `json:"scaling,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.
@@ -356,6 +399,9 @@ type GreatDBPaxosStatus struct {
 	// +optional
 	RestartMember RestartMember `json:"restartMember,omitempty"`
 
+	// Members currently undergoing resizing
+	ScaleInMember string `json:"scaleInMember,omitempty"`
+
 	// User initialization result record
 	// +optional
 	Users []User `json:"users,omitempty"`
@@ -392,6 +438,15 @@ type GreatDBPaxosList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []GreatDBPaxos `json:"items"`
+}
+
+func (g GreatDBPaxos) GetClusterDomain() string {
+
+	if g.Spec.ClusterDomain == "" {
+		return "cluster.local"
+	}
+
+	return g.Spec.ClusterDomain
 }
 
 func init() {

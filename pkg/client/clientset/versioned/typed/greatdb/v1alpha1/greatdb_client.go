@@ -27,12 +27,22 @@ import (
 
 type GreatdbV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	GreatDBBackupRecordsGetter
+	GreatDBBackupSchedulesGetter
 	GreatDBPaxosesGetter
 }
 
 // GreatdbV1alpha1Client is used to interact with features provided by the greatdb.com group.
 type GreatdbV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *GreatdbV1alpha1Client) GreatDBBackupRecords(namespace string) GreatDBBackupRecordInterface {
+	return newGreatDBBackupRecords(c, namespace)
+}
+
+func (c *GreatdbV1alpha1Client) GreatDBBackupSchedules(namespace string) GreatDBBackupScheduleInterface {
+	return newGreatDBBackupSchedules(c, namespace)
 }
 
 func (c *GreatdbV1alpha1Client) GreatDBPaxoses(namespace string) GreatDBPaxosInterface {

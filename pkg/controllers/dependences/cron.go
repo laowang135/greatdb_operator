@@ -14,6 +14,8 @@ type CronRegistry struct {
 	BackupJobs *sync.Map
 }
 
+var CronRegistryManager CronRegistry
+
 // AddFuncWithSeconds does the same as cron.AddFunc but changes the schedule so that the function will run the exact second that this method is called.
 func (r *CronRegistry) AddFuncWithSeconds(spec string, cmd func()) (cron.EntryID, error) {
 	schedule, err := cron.ParseStandard(spec)
@@ -41,5 +43,3 @@ func NewCronRegistry(client *ClientSet) CronRegistry {
 
 	return CronRegistryManager
 }
-
-var CronRegistryManager CronRegistry

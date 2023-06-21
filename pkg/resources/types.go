@@ -1,15 +1,10 @@
 package resources
 
 import (
-	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	"greatdb-operator/pkg/config"
 )
 
 // Resource synchronization logical interface
-type Manager interface {
-	// Implementing resource synchronization logic in sync method
-	Sync(*v1alpha1.GreatDBPaxos) error
-}
 
 type PaxosMember struct {
 	ChannelName string `json:"CHANNEL_NAME,omitempty"`
@@ -36,13 +31,13 @@ var (
 )
 
 type MembershipInfo struct {
-	MemberId             string `json:member_id,omitempty`
-	ViewID               string `json:view_id,omitempty`
-	MemberRole           string `json:member_role,omitempty`
-	MemberState          string `json:member_state,omitempty`
-	MemberVersion        string `json:member_version,omitempty`
-	MemberCount          int32  `json:member_count,omitempty`
-	ReachableMemberCount int32  `json:reachable_member_count,omitempty`
+	MemberId             string `json:"member_id,omitempty"`
+	ViewID               string `json:"view_id,omitempty"`
+	MemberRole           string `json:"member_role,omitempty"`
+	MemberState          string `json:"member_state,omitempty"`
+	MemberVersion        string `json:"member_version,omitempty"`
+	MemberCount          int32  `json:"member_count,omitempty"`
+	ReachableMemberCount int32  `json:"reachable_member_count,omitempty"`
 }
 
 // label
@@ -62,6 +57,12 @@ const (
 	AppKubeServiceReadyLabelKey = "app.kubernetes.io/ready"
 	AppKubeServiceReady         = "true"
 	AppKubeServiceNotReady      = "false"
+
+	// backup
+	AppKubeBackupNameLabelKey         = "greatdb.com/backup"
+	AppKubeBackupScheduleNameLabelKey = "greatdb.com/backupschedule"
+	AppKubeBackupRecordNameLabelKey   = "greatdb.com/backuprecord"
+	AppKubeBackupResourceTypeLabelKey = "greatdb.com/backupresource"
 )
 
 // Finalizers
@@ -84,8 +85,9 @@ const (
 
 // pvc
 const (
-	GreatdbPvcDataName   = "data"
-	GreatDBPvcConfigName = "config"
+	GreatdbPvcDataName          = "data"
+	GreatDBPvcConfigName        = "config"
+	GreatdbBackupPvcName string = "backup"
 )
 
 // user
@@ -101,7 +103,8 @@ const (
 // port
 
 const (
-	GroupPort = 33061
+	GroupPort        = 33061
+	BackupServerPort = 19999
 )
 
 var (

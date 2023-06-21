@@ -23,6 +23,10 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// GreatDBBackupRecords returns a GreatDBBackupRecordInformer.
+	GreatDBBackupRecords() GreatDBBackupRecordInformer
+	// GreatDBBackupSchedules returns a GreatDBBackupScheduleInformer.
+	GreatDBBackupSchedules() GreatDBBackupScheduleInformer
 	// GreatDBPaxoses returns a GreatDBPaxosInformer.
 	GreatDBPaxoses() GreatDBPaxosInformer
 }
@@ -36,6 +40,16 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// GreatDBBackupRecords returns a GreatDBBackupRecordInformer.
+func (v *version) GreatDBBackupRecords() GreatDBBackupRecordInformer {
+	return &greatDBBackupRecordInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// GreatDBBackupSchedules returns a GreatDBBackupScheduleInformer.
+func (v *version) GreatDBBackupSchedules() GreatDBBackupScheduleInformer {
+	return &greatDBBackupScheduleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // GreatDBPaxoses returns a GreatDBPaxosInformer.

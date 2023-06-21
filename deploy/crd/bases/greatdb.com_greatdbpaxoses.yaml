@@ -883,6 +883,62 @@ spec:
                   type: string
                 description: Annotations for the component.
                 type: object
+              backup:
+                description: configure backup support
+                properties:
+                  enable:
+                    default: true
+                    description: Is the backup service enabled? If it is not enabled,
+                      even if a backup plan is created, it will not be backed up
+                    type: boolean
+                  nfs:
+                    description: configuring nfs addresses for backup storage
+                    properties:
+                      path:
+                        description: 'path that is exported by the NFS server. More
+                          info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                        type: string
+                      readOnly:
+                        description: 'readOnly here will force the NFS export to be
+                          mounted with read-only permissions. Defaults to false. More
+                          info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                        type: boolean
+                      server:
+                        description: 'server is the hostname or IP address of the
+                          NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                        type: string
+                    required:
+                    - path
+                    - server
+                    type: object
+                  resources:
+                    description: Compute Resources required by this container. Cannot
+                      be updated
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Limits describes the maximum amount of compute
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: 'Requests describes the minimum amount of compute
+                          resources required. If Requests is omitted for a container,
+                          it defaults to Limits if that is explicitly specified, otherwise
+                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                        type: object
+                    type: object
+                type: object
               clusterDomain:
                 default: cluster.local
                 description: The cluster domain of the current k8s cluster
@@ -1201,6 +1257,31 @@ spec:
                     - all
                     type: string
                 type: object
+              scaling:
+                description: Expansion and contraction configuration
+                properties:
+                  scaleIn:
+                    description: Shrinkage configuration
+                    properties:
+                      instance:
+                        description: Effective only when the policy is defined
+                        items:
+                          type: string
+                        type: array
+                      strategy:
+                        default: fault
+                        description: 'Shrinkage strategy,Default fault index: Reduce
+                          in reverse order based on index fault: Prioritize scaling
+                          down faulty nodes and then reduce them in reverse order
+                          based on index define: Shrink the instance specified in
+                          the instance field'
+                        enum:
+                        - index
+                        - fault
+                        - define
+                        type: string
+                    type: object
+                type: object
               secretName:
                 description: SecretName is used to configure cluster account password
                   authentication
@@ -1474,7 +1555,7 @@ spec:
                 format: date-time
                 type: string
               member:
-                description: Expect service state of GreatDB instance.
+                description: Current service state of GreatDB instance.
                 items:
                   description: GreatDBCondition  instance service state of GreatDB.
                   properties:
@@ -1549,6 +1630,9 @@ spec:
                     description: Restarting an instance
                     type: object
                 type: object
+              scaleInMember:
+                description: Members currently undergoing resizing
+                type: string
               status:
                 description: The state of the cluster
                 type: string

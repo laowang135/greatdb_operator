@@ -1,0 +1,20 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBPaxos
+metadata:
+  name: greatdb-sample
+spec:
+  image: 172.17.120.107:5000/mysql:v8.0.26-06131821
+  version: 8.0.26
+  port: 3306
+  service:
+    type: NodePort
+    readPort: 30020
+    writePort: 30021
+  restart:
+    enable: true
+    mode: cluster
+  backup:
+    enable: true
+    nfs:
+      path: /home/nfs/
+      server: 172.17.120.143

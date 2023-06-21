@@ -3,6 +3,7 @@ package greatdbpaxos
 import (
 	"context"
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
+	"greatdb-operator/pkg/resources"
 	"time"
 
 	dblog "greatdb-operator/pkg/utils/log"
@@ -36,15 +37,18 @@ func (great GreatDBManager) restartGreatDB(cluster *v1alpha1.GreatDBPaxos, podIn
 	}
 
 	if cluster.Spec.Restart.Mode == v1alpha1.ClusterRestart {
-		return great.restartCluster(cluster, podIns)
+		err = great.restartCluster(cluster, podIns)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = great.restartInstance(cluster, podIns)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = great.restartInstance(cluster, podIns)
-	if err != nil {
-		return err
-	}
-
-	if len(cluster.Status.UpgradeMember.Upgrading) > 0 {
+	if len(cluster.Status.RestartMember.Restarting) > 0 {
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosRestart, "")
 	}
 
@@ -55,13 +59,14 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 
 	if value, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
 		// Restarting requires at least 30 seconds before continuing to determine
-		t := StringToTime(value)
-		if time.Now().Local().Sub(t) < time.Second*30 {
+		t := resources.StringToTime(value)
+		if resources.GetNowTime().Sub(t) < time.Second*30 {
 			return nil
 		}
 		for _, member := range cluster.Status.Member {
-			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline && t.Sub(member.LastTransitionTime.Time) < 0 {
-				cluster.Status.RestartMember.Restarted[podIns.Name] = GetNowTime()
+			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline &&
+				(t.Sub(member.LastTransitionTime.Time) < 0 || t.Sub(podIns.CreationTimestamp.Time) < 0) {
+				cluster.Status.RestartMember.Restarted[podIns.Name] = resources.GetNowTimeToString()
 				delete(cluster.Status.RestartMember.Restarting, podIns.Name)
 				break
 			}
@@ -95,7 +100,7 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		return nil
 	}
 	if !podIns.DeletionTimestamp.IsZero() {
-		cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
+		cluster.Status.RestartMember.Restarting[podIns.Name] = resources.GetNowTimeToString()
 		return nil
 	}
 
@@ -117,7 +122,7 @@ func (great GreatDBManager) restartInstance(cluster *v1alpha1.GreatDBPaxos, podI
 		}
 
 	}
-	cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
+	cluster.Status.RestartMember.Restarting[podIns.Name] = resources.GetNowTimeToString()
 
 	return nil
 
@@ -127,14 +132,16 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 
 	if value, ok := cluster.Status.RestartMember.Restarting[podIns.Name]; ok {
 		// Restarting requires at least 30 seconds before continuing to determine
-		t := StringToTime(value)
+		t := resources.StringToTime(value)
 
-		if time.Now().Local().Sub(t) < time.Second*30 {
+		if resources.GetNowTime().Sub(t) < time.Second*30 {
 			return nil
 		}
 		for _, member := range cluster.Status.Member {
+
 			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusReady && t.Sub(member.LastTransitionTime.Time) < 0 {
-				cluster.Status.RestartMember.Restarted[podIns.Name] = GetNowTime()
+				cluster.Status.RestartMember.Restarted[podIns.Name] = resources.GetNowTimeToString()
+
 				delete(cluster.Status.RestartMember.Restarting, podIns.Name)
 				break
 			}
@@ -150,7 +157,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 	}
 
 	if !podIns.DeletionTimestamp.IsZero() {
-		cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
+		cluster.Status.RestartMember.Restarting[podIns.Name] = resources.GetNowTimeToString()
 		return nil
 	}
 
@@ -172,7 +179,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		}
 
 	}
-	cluster.Status.RestartMember.Restarting[podIns.Name] = GetNowTime()
+	cluster.Status.RestartMember.Restarting[podIns.Name] = resources.GetNowTimeToString()
 
 	return nil
 

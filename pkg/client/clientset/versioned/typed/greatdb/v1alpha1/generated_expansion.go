@@ -17,4 +17,8 @@ limitations under the License.
 
 package v1alpha1
 
+type GreatDBBackupRecordExpansion interface{}
+
+type GreatDBBackupScheduleExpansion interface{}
+
 type GreatDBPaxosExpansion interface{}

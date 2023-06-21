@@ -28,6 +28,14 @@ type FakeGreatdbV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeGreatdbV1alpha1) GreatDBBackupRecords(namespace string) v1alpha1.GreatDBBackupRecordInterface {
+	return &FakeGreatDBBackupRecords{c, namespace}
+}
+
+func (c *FakeGreatdbV1alpha1) GreatDBBackupSchedules(namespace string) v1alpha1.GreatDBBackupScheduleInterface {
+	return &FakeGreatDBBackupSchedules{c, namespace}
+}
+
 func (c *FakeGreatdbV1alpha1) GreatDBPaxoses(namespace string) v1alpha1.GreatDBPaxosInterface {
 	return &FakeGreatDBPaxoses{c, namespace}
 }

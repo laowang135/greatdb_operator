@@ -1,8 +1,8 @@
 package resources
 
 import (
+	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	deps "greatdb-operator/pkg/controllers/dependences"
-	"greatdb-operator/pkg/resources"
 
 	"greatdb-operator/pkg/resources/configmap"
 
@@ -10,17 +10,33 @@ import (
 
 	"greatdb-operator/pkg/resources/service"
 
+	"greatdb-operator/pkg/resources/greatdbbackup"
 	"greatdb-operator/pkg/resources/greatdbpaxos"
 	"greatdb-operator/pkg/resources/pods"
 
 	"k8s.io/client-go/tools/record"
 )
 
+type manager interface {
+	// Implementing resource synchronization logic in sync method
+	Sync(*v1alpha1.GreatDBPaxos) error
+}
+
+type BackupManager interface {
+	// Implementing resource synchronization logic in sync method
+	Sync(*v1alpha1.GreatDBBackupSchedule) error
+}
+
+type BackupRecordManager interface {
+	// Implementing resource synchronization logic in sync method
+	Sync(*v1alpha1.GreatDBBackupRecord) error
+}
+
 type GreatDBPaxosResourceManagers struct {
-	ConfigMap resources.Manager
-	Service   resources.Manager
-	Secret    resources.Manager
-	GreatDB   resources.Manager
+	ConfigMap manager
+	Service   manager
+	Secret    manager
+	GreatDB   manager
 }
 
 func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *GreatDBPaxosResourceManagers {
@@ -39,7 +55,7 @@ func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Liste
 }
 
 type ReadAndWriteManager struct {
-	Pods resources.Manager
+	Pods manager
 }
 
 func NewReadAndWriteManager(client *deps.ClientSet, listers *deps.Listers) *ReadAndWriteManager {
@@ -47,4 +63,30 @@ func NewReadAndWriteManager(client *deps.ClientSet, listers *deps.Listers) *Read
 	return &ReadAndWriteManager{
 		Pods: pod,
 	}
+}
+
+type GreatDBBackupScheduleResourceManager struct {
+	Scheduler BackupManager
+}
+
+func NewGreatDBBackupScheduleResourceManager(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *GreatDBBackupScheduleResourceManager {
+
+	scheduler := &greatdbbackup.GreatDBBackupScheduleManager{Client: client, Listers: listers, Recorder: recorder}
+	return &GreatDBBackupScheduleResourceManager{
+		Scheduler: scheduler,
+	}
+
+}
+
+type GreatDBBackupRecordResourceManager struct {
+	Record BackupRecordManager
+}
+
+func NewGreatDBBackupRecordResourceManager(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *GreatDBBackupRecordResourceManager {
+
+	record := &greatdbbackup.GreatDBBackupRecordManager{Client: client, Lister: listers, Recorder: recorder}
+	return &GreatDBBackupRecordResourceManager{
+		Record: record,
+	}
+
 }

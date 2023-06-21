@@ -1,6 +1,7 @@
 package greatdbpaxos
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	"greatdb-operator/pkg/resources"
+	"greatdb-operator/pkg/resources/internal"
 )
 
 func SplitImage(imageName string) (repo, tag string) {
@@ -219,4 +221,37 @@ func SubtractSlices(a, b []string) []string {
 		}
 	}
 	return result
+
+}
+
+func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClientinterface, error) {
+
+	user, pwd := resources.GetClusterUser(cluster)
+	port := int(cluster.Spec.Port)
+
+	client := internal.NewDBClient()
+
+	for _, member := range cluster.Status.Member {
+
+		if member.Type != v1alpha1.MemberStatusFree && member.Type != v1alpha1.MemberStatusOnline {
+			continue
+		}
+		// TODO Debug
+		// host := member.Address
+		// if host == "" {
+		// 	host = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+		// }
+
+		host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+
+		err := client.Connect(user, pwd, host, port, "mysql")
+
+		if err != nil {
+			return nil, err
+		}
+		return client, nil
+
+	}
+	return nil, fmt.Errorf("no available connections")
+
 }
