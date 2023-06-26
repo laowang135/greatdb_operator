@@ -1281,6 +1281,20 @@ spec:
                         - define
                         type: string
                     type: object
+                  scaleOut:
+                    description: Configure expansion
+                    properties:
+                      source:
+                        default: backup
+                        description: 'Data source during expansion, optional backup,
+                          clone， The default type is backup. If there is no backup,
+                          use clone Backup: based on backup data Clone: based on the
+                          clone features provided by the database'
+                        enum:
+                        - backup
+                        - clone
+                        type: string
+                    type: object
                 type: object
               secretName:
                 description: SecretName is used to configure cluster account password

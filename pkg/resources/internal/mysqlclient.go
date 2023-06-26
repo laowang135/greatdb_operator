@@ -83,7 +83,7 @@ func (client *defaultDBClient) Connect(user, pass, host string, port int, dbname
 		return fmt.Errorf("failed to connect to mysql: %s:%d, reason: %v", host, port, err)
 	}
 
-	db.SetConnMaxLifetime(2 * time.Second)
+	db.SetConnMaxLifetime(3 * time.Second)
 	db.SetMaxIdleConns(5)
 	db.SetMaxOpenConns(10)
 

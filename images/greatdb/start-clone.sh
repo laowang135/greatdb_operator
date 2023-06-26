@@ -22,11 +22,12 @@ pre_check() {
         if [ -f "/greatdb/mysql/conf/init" ]; then
             DATABASE_USER_ALREADY_INIT="true"
         fi
+
+        if [ -f "/greatdb/mysql/conf/clone" ]; then
+            DATABASE_CLONE_ALREADY="true"
+        fi
     fi
 
-    if [ -f "$DATABASE_DIR/data/xtrabackup_info" ]; then
-        IS_FROM_BACKUP="true"
-    fi
 }
 
 init_config() {
@@ -72,11 +73,6 @@ init_database_dir() {
         useradd -r -g greatdb -s /bin/false greatdb
     fi
 
-    if [ "$IS_FROM_BACKUP" == "true" ]; then
-        # backup
-        backup_start_init_database_dir
-        return
-    fi
 
     normal_start_init_database_dir
     if [ "$?" != "0" ]; then
@@ -84,17 +80,7 @@ init_database_dir() {
     fi
 }
 
-backup_start_init_database_dir() {
-    if [ "$DATABASE_ALREADY_EXISTS" != "true" ]; then
-        echo "Directory does not exist, create directory"
-        mkdir -p /greatdb/mysql/{socket,logfile,pid,tmp,conf}
-    fi
 
-    # chown -R greatdb:greatdb /greatdb/mysql/
-    # init config
-    init_config
-    echo 1 >/greatdb/mysql/conf/initdata
-}
 
 normal_start_init_database_dir() {
     if [ "$DATABASE_ALREADY_EXISTS" != "true" ]; then
@@ -163,67 +149,52 @@ EOSQL
 
 }
 
-init_gtid_sql() {
+
+clone_data(){
+   mysql -S /greatdb/mysql/socket/mysql.sock -u"${ClusterUser}" -p"${ClusterUserPassword}" <<-EOSQL
+        set global clone_valid_donor_list='${CloneValidDonor}:${SERVERPORT}';
+        stop group_replication;
+        set global super_read_only=0;
+        clone INSTANCE FROM '${ClusterUser}'@'${CloneValidDonor}':${SERVERPORT} IDENTIFIED BY '${ClusterUserPassword}';
+
+EOSQL
+}
+
+start_clone() {
 
     until [ -S "/greatdb/mysql/socket/mysql.sock" ]; do
         echo "Wait for MySQL to be ready"
+        num=$(ps -ef| grep "$mysql_server" | wc -l)
+        if [ $num -lt '2' ];then 
+            exit 1
+        fi
         sleep 5
     done
 
-    if [ "$DATABASE_USER_ALREADY_INIT" == "true" ]; then
-        return
-    fi
-    for val in $(cat /greatdb/mysql/data/xtrabackup_info | grep GTID); do
-        gtid_purged=$val
-    done
 
-    if [ "$gtid_purged" == "" ]; then
-        echo "reset"
-        $mysql_client -S /greatdb/mysql/socket/mysql.sock -u"${ClusterUser}" -p"${ClusterUserPassword}" <<-EOSQL
-        stop slave;
-        reset master;
-        reset slave;
-EOSQL
-
-    else
-        echo "reset and set  gtid_purged"
-        $mysql_client -S /greatdb/mysql/socket/mysql.sock -u"${ClusterUser}" -p"${ClusterUserPassword}" <<-EOSQL
-        stop slave;
-        reset master;
-        reset slave;
-        set global gtid_purged=${gtid_purged};
-EOSQL
-
-    fi
-
+    err=$(clone_data 2>&1 >>/dev/null)
     if [ "$?" != "0" ]; then
-        echo "Failed to reset slave"
-        exit 1
+        
+       if echo $err | grep -q 'mysqld is not managed by supervisor process'; then
+            echo 1 >/greatdb/mysql/conf/clone
+            echo "clone Successfully"
+            exit 0
+        fi
+        echo "Failed to clone "
+             exit 1
     fi
-
-    echo "reset Successfully"
-
-    echo 1 >/greatdb/mysql/conf/init
-    DATABASE_USER_ALREADY_INIT="true"
-
+    echo 1 >/greatdb/mysql/conf/clone
+    echo "clone Successfully"
+   
 }
 
+
 init_sql(){
-     if [ "$IS_FROM_BACKUP" == "true" ]; then
-
-        init_gtid_sql
-        if [ "$?" != "0" ]; then
-            echo "Failed to start the database"
-            exit 1
-        fi
-        return
-    fi
-
-   
+     
     init_user_sql
     if [ "$?" != "0" ]; then
-            echo "Failed to start the database"
-            exit 1
+        echo "Failed to start the database"
+        exit 1
     fi
 
 }
@@ -236,6 +207,12 @@ start_mysql() {
 
 _main() {
     pre_check
+
+    if [ "$DATABASE_CLONE_ALREADY" == "true" ]; then
+        echo " Successfully"
+        return
+    fi
+
     init_database_dir
     if [ "$?" != "0" ]; then
         echo "Failed to start the database"
@@ -254,10 +231,18 @@ _main() {
         exit 1
     fi
 
-    echo "start  Successfully"
+
+    start_clone
+    if [ "$?" != "0" ]; then
+        echo "Failed to exec clone "
+        exit 1
+    fi
+ 
+
+    echo "Successfully"
+    sleep 5
    
 }
 
 _main
 
-wait

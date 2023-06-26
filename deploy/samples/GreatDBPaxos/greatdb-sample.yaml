@@ -3,7 +3,7 @@ kind: GreatDBPaxos
 metadata:
   name: greatdb-sample
 spec:
-  image: 172.17.120.107:5000/mysql:v8.0.26-06131821
+  image: 172.17.120.107:5000/mysql:	v8.0.26-06261743
   version: 8.0.26
   port: 3306
   service:

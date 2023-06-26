@@ -56,6 +56,44 @@ func (great GreatDBManager) newGreatDBBackupContainers(backuprecord *v1alpha1.Gr
 	return
 }
 
+func (great GreatDBManager) newGreatDBCloneContainers(donorIns string, cluster *v1alpha1.GreatDBPaxos) (container corev1.Container) {
+
+	env := great.newGreatDBCloneRestoreEnv(donorIns, cluster)
+	envForm := great.newGreatDBEnvForm(cluster.Spec.SecretName)
+	imagePullPolicy := corev1.PullIfNotPresent
+	if cluster.Spec.ImagePullPolicy != "" {
+		imagePullPolicy = cluster.Spec.ImagePullPolicy
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{ // backup
+			Name:      resources.GreatdbPvcDataName,
+			MountPath: greatdbDataMountPath,
+		},
+	}
+
+	resource := corev1.ResourceRequirements{}
+	resource.Requests = make(corev1.ResourceList)
+	resource.Limits = make(corev1.ResourceList)
+
+	resource.Requests[corev1.ResourceCPU] = k8sresource.MustParse("2")
+	resource.Limits[corev1.ResourceCPU] = resource.Requests[corev1.ResourceCPU]
+	resource.Requests[corev1.ResourceMemory] = k8sresource.MustParse("2Gi")
+	resource.Limits[corev1.ResourceMemory] = resource.Requests[corev1.ResourceMemory]
+	container = corev1.Container{
+		Name:            "greatdb-clone",
+		Env:             env,
+		EnvFrom:         envForm,
+		Command:         []string{"start-clone.sh"},
+		Image:           cluster.Spec.Image,
+		Resources:       resource,
+		ImagePullPolicy: imagePullPolicy,
+		VolumeMounts:    volumeMounts,
+	}
+
+	return
+}
+
 func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.GreatDBBackupRecord, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
 
 	// TODO DEBUG
@@ -131,6 +169,58 @@ func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.Gr
 			},
 		}
 		env = append(env, uploadServerEnv...)
+	}
+
+	return
+}
+
+func (great GreatDBManager) newGreatDBCloneRestoreEnv(donorIns string, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
+
+	svcName := cluster.Name + resources.ComponentGreatDBSuffix
+	donor := fmt.Sprintf("%s.%s.%s.svc.%s", donorIns, svcName, cluster.Namespace, cluster.GetClusterDomain())
+	env = []corev1.EnvVar{
+		{
+			Name:  "CloneValidDonor",
+			Value: donor,
+		},
+		{
+			Name: "PODNAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  "SERVICE_NAME",
+			Value: svcName,
+		},
+		{
+			Name:  "CLUSTERDOMAIN",
+			Value: cluster.GetClusterDomain(),
+		},
+		{
+			Name:  "FQDN",
+			Value: "$(PODNAME).$(SERVICE_NAME).$(NAMESPACE).svc.$(CLUSTERDOMAIN)",
+		},
+		{
+			Name:  "SERVERPORT",
+			Value: fmt.Sprintf("%d", cluster.Spec.Port),
+		}, //
+		{
+			Name:  "GROUPLOCALADDRESS",
+			Value: "$(PODNAME).$(SERVICE_NAME).$(NAMESPACE).svc.$(CLUSTERDOMAIN)" + fmt.Sprintf(":%d", resources.GroupPort),
+		},
 	}
 
 	return

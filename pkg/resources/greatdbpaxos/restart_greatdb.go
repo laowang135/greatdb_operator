@@ -139,7 +139,7 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		}
 		for _, member := range cluster.Status.Member {
 
-			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusReady && t.Sub(member.LastTransitionTime.Time) < 0 {
+			if member.Name == podIns.Name && member.Type == v1alpha1.MemberStatusOnline && t.Sub(member.LastTransitionTime.Time) < 0 {
 				cluster.Status.RestartMember.Restarted[podIns.Name] = resources.GetNowTimeToString()
 
 				delete(cluster.Status.RestartMember.Restarting, podIns.Name)
