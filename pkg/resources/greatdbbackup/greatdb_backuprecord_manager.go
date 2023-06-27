@@ -485,7 +485,7 @@ func (great GreatDBBackupRecordManager) getBackupInfo(backuprecord *v1alpha1.Gre
 	// backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, clusterDomain)
 	// server := fmt.Sprintf("http://%s:%d%s", backupServerAddress, backupServer.ServerPort, backupServer.ServerBackupInfoEndpoint)
 
-	server := fmt.Sprintf("http://%s:%d%s", "172.17.120.142", 30015, backupServer.ServerBackupInfoEndpoint)
+	server := fmt.Sprintf("http://%s:%d%s", "172.17.120.142", 30031, backupServer.ServerBackupInfoEndpoint)
 
 	resp, err := http.Post(server,
 		"application/json",

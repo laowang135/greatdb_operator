@@ -506,7 +506,7 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 					online_peers = append(online_peers, peer)
 				}
 			}
-			missing := SubtractSlices(online_peers, onlineMemberAddress)
+			missing := SubtractSlices(onlineMemberAddress, online_peers)
 			if len(missing) > 0 {
 				dblog.Log.Errorf("Cluster status results inconsistent: Group view of %s has %s but these are not ONLINE: %s", address, online_peers, missing)
 				return activePartitions, blockedPartitions
@@ -914,7 +914,10 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 		}
 		gtidExecuted[pod.UID] = instanceStatus.gtidUnion
 		// allMemberPods = append(allMemberPods, member)
-		onlineMemberAddress = append(onlineMemberAddress, member.Address)
+		if member.Type != "" && member.Type != v1alpha1.MemberStatusFree {
+			onlineMemberAddress = append(onlineMemberAddress, member.Address)
+		}
+
 		if instanceStatus.State == v1alpha1.MemberStatusUnknown {
 			unsurePods = append(unsurePods, member)
 		} else if instanceStatus.State == v1alpha1.MemberStatusOffline || instanceStatus.State == v1alpha1.MemberStatusError || instanceStatus.State == v1alpha1.MemberStatusUnknown {

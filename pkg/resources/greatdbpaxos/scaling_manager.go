@@ -255,8 +255,13 @@ func (great GreatDBManager) getScaleInMember(cluster *v1alpha1.GreatDBPaxos) v1a
 				member = mem
 				continue
 			}
-
 		}
+
+		if maxPriority == 0 {
+			num := len(cluster.Status.Member)
+			member = cluster.Status.Member[num-1]
+		}
+
 	default:
 		num := len(cluster.Status.Member)
 		member = cluster.Status.Member[num-1]
