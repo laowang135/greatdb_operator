@@ -227,8 +227,6 @@ const (
 	// Unknown - Uncertain because we can't connect or query it
 	MemberStatusUnknown MemberConditionType = "UNKNOWN"
 
-	MemberStatusReady MemberConditionType = "Ready"
-
 	// MemberStatusPending The instance is still starting
 	MemberStatusPending MemberConditionType = "Pending"
 
@@ -244,6 +242,26 @@ const (
 	// MemberStatusFailure  The member was changed to a failed state due to a long-term error
 	MemberStatusFailure MemberConditionType = "Failure"
 )
+
+func (state MemberConditionType) ScaleInPriority() int {
+
+	priority := 0
+	switch state {
+	case MemberStatusOnline, MemberStatusRecovering:
+		priority = 0
+	case MemberStatusFree, MemberStatusPending:
+		priority = 1
+	case MemberStatusPause, MemberStatusUnknown, MemberStatusRestart:
+		priority = 2
+	case MemberStatusUnmanaged, MemberStatusOffline, MemberStatusError:
+		priority = 3
+	case MemberStatusFailure:
+		priority = 4
+
+	}
+
+	return priority
+}
 
 func (state MemberConditionType) Parse() MemberConditionType {
 
@@ -287,4 +305,11 @@ const (
 
 	// Shrink the specified instance
 	ScaleInStrategyDefine ScaleInStrategyType = "define"
+)
+
+type ScaleOutSourceType string
+
+const (
+	ScaleOutSourceBackup ScaleOutSourceType = "backup"
+	ScaleOutSourceClone  ScaleOutSourceType = "clone"
 )

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"strconv"
 
@@ -291,14 +293,53 @@ func (great GreatDBManager) GetPodSpec(cluster *v1alpha1.GreatDBPaxos, member v1
 func (great GreatDBManager) newGreatDBInitContainers(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (containers []corev1.Container, err error) {
 
 	if member.CreateType == v1alpha1.ScaleCreateMember || member.CreateType == v1alpha1.FailOverCreateMember {
-		lastBackuprecord := great.getLatestSuccessfulBackup(cluster.Namespace, cluster.Name, string(v1alpha1.GreatDBBackupResourceType))
-		// todo create backup
-		if lastBackuprecord == nil {
-			return nil, fmt.Errorf("no successful backup records exist")
+		var lastBackuprecord *v1alpha1.GreatDBBackupRecord
+		if cluster.Spec.Scaling.ScaleOut.Source == v1alpha1.ScaleOutSourceBackup {
+			lastBackuprecord = great.getLatestSuccessfulBackup(cluster.Namespace, cluster.Name, string(v1alpha1.GreatDBBackupResourceType))
 		}
-		db := great.newGreatDBBackupContainers(lastBackuprecord, cluster)
 
-		containers = append(containers, db)
+		if lastBackuprecord == nil {
+			instanceName := make([]string, 0)
+			primaryIns := ""
+			ins := ""
+
+			for _, member := range cluster.Status.Member {
+
+				if member.Type != v1alpha1.MemberStatusOnline {
+					continue
+				}
+				if v1alpha1.MemberRoleType(member.Role).Parse() == v1alpha1.MemberRolePrimary {
+					primaryIns = member.Name
+				} else {
+					instanceName = append(instanceName, member.Name)
+				}
+
+			}
+
+			if len(instanceName) > 0 {
+				if len(instanceName) == 1 {
+					ins = instanceName[0]
+				} else {
+					rand.Seed(time.Now().UnixNano())
+					ins = instanceName[rand.Intn(len(instanceName))]
+				}
+			}
+
+			if primaryIns != "" && ins == "" {
+				ins = primaryIns
+			}
+			if ins == "" {
+				return nil, fmt.Errorf("No ready instances available for cloning operation")
+			}
+
+			db := great.newGreatDBCloneContainers(ins, cluster)
+			containers = append(containers, db)
+
+		} else {
+			db := great.newGreatDBBackupContainers(lastBackuprecord, cluster)
+			containers = append(containers, db)
+		}
+
 	}
 
 	return

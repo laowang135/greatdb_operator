@@ -220,7 +220,48 @@ func (great GreatDBManager) getScaleInMember(cluster *v1alpha1.GreatDBPaxos) v1a
 	var member v1alpha1.MemberCondition
 	switch cluster.Spec.Scaling.ScaleIn.Strategy {
 	case v1alpha1.ScaleInStrategyDefine:
+		exist := false
+		index := 0
+		for i, name := range cluster.Spec.Scaling.ScaleIn.Instance {
+
+			for _, mem := range cluster.Status.Member {
+				if mem.Name == name {
+					member = mem
+					exist = true
+					break
+				}
+			}
+			index = i
+			if exist {
+				break
+			}
+
+		}
+		// If the set instance does not exist, return the last one
+		if !exist {
+			num := len(cluster.Status.Member)
+			member = cluster.Status.Member[num-1]
+		} else {
+
+			cluster.Spec.Scaling.ScaleIn.Instance = cluster.Spec.Scaling.ScaleIn.Instance[index+1:]
+		}
+
 	case v1alpha1.ScaleInStrategyFault:
+		maxPriority := 0
+		for _, mem := range cluster.Status.Member {
+
+			if mem.Type.ScaleInPriority() > maxPriority || member.Name == "" {
+				maxPriority = mem.Type.ScaleInPriority()
+				member = mem
+				continue
+			}
+		}
+
+		if maxPriority == 0 {
+			num := len(cluster.Status.Member)
+			member = cluster.Status.Member[num-1]
+		}
+
 	default:
 		num := len(cluster.Status.Member)
 		member = cluster.Status.Member[num-1]

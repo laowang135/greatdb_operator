@@ -104,6 +104,19 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 		cluster.Spec.UpgradeStrategy = v1alpha1.RollingUpgrade
 	}
 
+	if cluster.Spec.Scaling == nil {
+		cluster.Spec.Scaling = &v1alpha1.Scaling{
+			ScaleIn: v1alpha1.ScaleIn{
+				Strategy: v1alpha1.ScaleInStrategyIndex,
+			},
+		}
+	}
+
+	// TODO DEBUG
+	if cluster.Spec.Scaling.ScaleOut.Source == "" {
+		cluster.Spec.Scaling.ScaleOut.Source = v1alpha1.ScaleOutSourceBackup
+	}
+
 	if cluster.Spec.Instances < 3 {
 		update = true
 		cluster.Spec.Instances = 3

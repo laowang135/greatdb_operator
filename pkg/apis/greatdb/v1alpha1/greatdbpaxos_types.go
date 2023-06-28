@@ -105,6 +105,9 @@ type Scaling struct {
 	// Shrinkage configuration
 	// +optional
 	ScaleIn ScaleIn `json:"scaleIn,omitempty"`
+	// Configure expansion
+	// +optional
+	ScaleOut ScaleOut `json:"scaleOut,omitempty"`
 }
 
 type ScaleIn struct {
@@ -117,6 +120,16 @@ type ScaleIn struct {
 	Strategy ScaleInStrategyType `json:"strategy,omitempty"`
 	// Effective only when the policy is defined
 	Instance []string `json:"instance,omitempty"`
+}
+
+type ScaleOut struct {
+	// Data source during expansion, optional backup, clone， The default type is backup. If there is no backup, use clone
+	// Backup: based on backup data
+	// Clone: based on the clone features provided by the database
+	// +kubebuilder:default="backup"
+	// +kubebuilder:validation:Enum="backup";"clone"
+	// +optional
+	Source ScaleOutSourceType `json:"source,omitempty"`
 }
 
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos

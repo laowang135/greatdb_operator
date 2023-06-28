@@ -206,16 +206,13 @@ func updateStatusCheck(cluster *v1alpha1.GreatDBPaxos) bool {
 }
 
 func SubtractSlices(a, b []string) []string {
-	setA := make(map[string]bool)
-	for _, v := range a {
-		setA[v] = true
-	}
+
 	setB := make(map[string]bool)
 	for _, v := range b {
 		setB[v] = true
 	}
 	result := []string{}
-	for k := range setA {
+	for _, k := range a {
 		if !setB[k] {
 			result = append(result, k)
 		}
