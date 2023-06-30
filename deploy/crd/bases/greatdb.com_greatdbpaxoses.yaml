@@ -962,6 +962,39 @@ spec:
                       type: string
                     type: array
                 type: object
+              failOver:
+                description: Failover Configuration
+                properties:
+                  autoScaleiIn:
+                    default: false
+                    description: Whether to automatically shrink the expansion node
+                      after the recovery of the faulty node, default： false
+                    type: boolean
+                  enable:
+                    default: true
+                    description: 'Enable failover function, default: true'
+                    type: boolean
+                  failoverPeriod:
+                    default: 10m
+                    description: The period of failover after the greatdb instance
+                      fails
+                    type: string
+                  maxInstance:
+                    default: 3
+                    description: Maximum number of recoverable instances
+                    format: int32
+                    type: integer
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: An eviction is allowed if at most "maxUnavailable"
+                      pods selected by "selector" are unavailable after the eviction,
+                      i.e. even in absence of the evicted pod. For example, one can
+                      prevent all voluntary evictions by specifying 0. This is a mutually
+                      exclusive setting with "minAvailable".
+                    x-kubernetes-int-or-string: true
+                type: object
               image:
                 description: image used by the GreatDBPaxos
                 type: string

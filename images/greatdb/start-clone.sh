@@ -173,8 +173,9 @@ start_clone() {
 
 
     err=$(clone_data 2>&1 >>/dev/null)
+    echo $err
     if [ "$?" != "0" ]; then
-        
+
        if echo $err | grep -q 'mysqld is not managed by supervisor process'; then
             echo 1 >/greatdb/mysql/conf/clone
             echo "clone Successfully"

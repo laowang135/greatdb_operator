@@ -347,3 +347,15 @@ func (great GreatDBManager) Deletepvc(pvc *corev1.PersistentVolumeClaim) error {
 
 	return nil
 }
+
+func (great GreatDBManager) DeleteFinalizers(ns, pvcName string) error {
+	patch := `[{"op":"remove","path":"/metadata/finalizers"}]`
+	_, err := great.Client.KubeClientset.CoreV1().PersistentVolumeClaims(ns).Patch(
+		context.TODO(), pvcName, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+	if err != nil {
+		dblog.Log.Errorf("failed to delete finalizers of pvc %s/%s,message: %s", ns, pvcName, err.Error())
+		return err
+	}
+
+	return nil
+}

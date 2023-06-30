@@ -523,7 +523,7 @@ func (greatdb greatdbConfigManager) updateGreatdbOption(cluster *v1alpha1.GreatD
 
 func (greatdb greatdbConfigManager) UpdateTargetInstanceToMember(cluster *v1alpha1.GreatDBPaxos) {
 
-	if cluster.Status.Phase != v1alpha1.GreatDBPaxosPending || cluster.Status.Phase == "" {
+	if cluster.Status.Phase != v1alpha1.GreatDBPaxosPending && cluster.Status.Phase != "" {
 		return
 	}
 

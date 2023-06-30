@@ -14,7 +14,7 @@ import (
 func (great GreatDBManager) Scale(cluster *v1alpha1.GreatDBPaxos) error {
 
 	if cluster.Status.Phase != v1alpha1.GreatDBPaxosReady && cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleIn &&
-		cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleOut && cluster.Status.Phase != v1alpha1.GreatDBPaxosRepair {
+		cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleOut && cluster.Status.Phase != v1alpha1.GreatDBPaxosFailover {
 		return nil
 	}
 
@@ -50,7 +50,7 @@ func (great GreatDBManager) ScaleOut(cluster *v1alpha1.GreatDBPaxos) error {
 			return nil
 		}
 
-		if cluster.Status.Phase != v1alpha1.GreatDBPaxosRepair && cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleOut {
+		if cluster.Status.Phase != v1alpha1.GreatDBPaxosFailover && cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleOut {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosScaleOut, "")
 		}
 
@@ -111,7 +111,7 @@ func (great GreatDBManager) ScaleOut(cluster *v1alpha1.GreatDBPaxos) error {
 func (great GreatDBManager) ScaleIn(cluster *v1alpha1.GreatDBPaxos) error {
 	// Only one node can be expanded at a time
 	if cluster.Status.TargetInstances < cluster.Status.CurrentInstances {
-		if cluster.Status.Phase != v1alpha1.GreatDBPaxosRepair && cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleIn {
+		if cluster.Status.Phase != v1alpha1.GreatDBPaxosFailover && cluster.Status.Phase != v1alpha1.GreatDBPaxosScaleIn {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosScaleIn, "")
 		}
 		num := len(cluster.Status.Member)
@@ -131,7 +131,14 @@ func (great GreatDBManager) ScaleIn(cluster *v1alpha1.GreatDBPaxos) error {
 
 		member := great.getScaleInMember(cluster)
 		great.ScaleInMember(cluster, member.Name)
-		err := great.deletePod(cluster.Namespace, member.Name)
+
+		great.stopGroupReplication(cluster, member)
+
+		err := great.DeleteFinalizers(cluster.Namespace, member.PvcName)
+		if err != nil {
+			return err
+		}
+		err = great.deletePod(cluster.Namespace, member.Name)
 		if err != nil {
 			return err
 		}
@@ -199,8 +206,8 @@ func (great GreatDBManager) SetVariableGroupSeeds(cluster *v1alpha1.GreatDBPaxos
 		err := client.Connect(user, password, host, int(cluster.Spec.Port), "mysql")
 		if err != nil {
 			dblog.Log.Reason(err).Error("failed to connect mysql")
-
-			return err
+			// TODO The problem of not being able to set up a single node yet to be resolved, resulting in the failure of the expansion node to join
+			continue
 		}
 
 		err = client.Exec(sql)
@@ -310,4 +317,25 @@ func (great GreatDBManager) GetMinOrMaxIndexMember(cluster *v1alpha1.GreatDBPaxo
 	}
 	return member
 
+}
+
+func (great GreatDBManager) stopGroupReplication(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) error {
+	client := internal.NewDBClient()
+	user, pwd := resources.GetClusterUser(cluster)
+	host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.GetClusterDomain())
+	port := int(cluster.Spec.Port)
+	err := client.Connect(user, pwd, host, port, "mysql")
+	if err != nil {
+		dblog.Log.Reason(err).Errorf("%s/%s.%s", cluster.Namespace, cluster.Name, member.Name)
+		return err
+	}
+	defer client.Close()
+
+	err = client.Exec("stop group_replication;")
+	if err != nil {
+		dblog.Log.Reason(err).Errorf("Failed to execute SQL statement %s/%s.%s", cluster.Namespace, cluster.Name, member.Name)
+		return err
+	}
+
+	return err
 }
