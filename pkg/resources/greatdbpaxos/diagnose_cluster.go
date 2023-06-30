@@ -34,7 +34,7 @@ func (cs *ClusterStatus) getInsByPodUID(podUID types.UID) (InstanceStatus, error
 			return ins, nil
 		}
 	}
-	return InstanceStatus{}, fmt.Errorf("No instance found by UID: %s", podUID)
+	return InstanceStatus{}, fmt.Errorf("no instance found by UID: %s", podUID)
 }
 
 func (cs *ClusterStatus) selectPodWithMostGtids() types.UID {
@@ -49,7 +49,7 @@ func (cs *ClusterStatus) selectPodWithMostGtids() types.UID {
 	return podIndexes[len(podIndexes)-1]
 }
 
-func (cs *ClusterStatus) createCluster(cluster *v1alpha1.GreatDBPaxos) error {
+func (cs *ClusterStatus) createCluster(cluster *v1alpha1.GreatDBPaxos) (err error) {
 	// Creating GR cluster
 	if len(cs.AllInstance) == 0 {
 		return nil
@@ -57,9 +57,11 @@ func (cs *ClusterStatus) createCluster(cluster *v1alpha1.GreatDBPaxos) error {
 
 	is := cs.AllInstance[0]
 	dblog.Log.Infof("Creating cluster %s from pod %s...", cluster.Name, is.PodIns.Name)
-	err := cs.bootCluster(cluster, is)
-	if err != nil {
-		return err
+	if is.State != v1alpha1.MemberStatusOnline {
+		err := cs.bootCluster(cluster, is)
+		if err != nil {
+			return err
+		}
 	}
 
 	// rejoin other Instance
@@ -70,7 +72,7 @@ func (cs *ClusterStatus) createCluster(cluster *v1alpha1.GreatDBPaxos) error {
 		err = cs.rejoinInstance(ins, cluster)
 		if err != nil {
 			dblog.Log.Reason(err).Errorf("Rejoin Instance Failed %s.%s", cluster.Name, is.PodIns.Name)
-
+			continue
 		}
 	}
 
@@ -86,9 +88,11 @@ func (cs *ClusterStatus) rebootCluster(cluster *v1alpha1.GreatDBPaxos) error {
 	}
 	dblog.Log.Infof("Rebooting cluster %s from pod %s...", cluster.Name, is.PodIns.Name)
 
-	err = cs.bootCluster(cluster, is)
-	if err != nil {
-		return err
+	if is.State != v1alpha1.MemberStatusOnline {
+		err := cs.bootCluster(cluster, is)
+		if err != nil {
+			return err
+		}
 	}
 
 	// rejoin other Instance
@@ -158,21 +162,13 @@ func (cs *ClusterStatus) forceQuorum(cluster *v1alpha1.GreatDBPaxos) error {
 	return err
 }
 
-func (cs *ClusterStatus) destroyCluster(cluster *v1alpha1.GreatDBPaxos) {
-	// Stopping GR for last cluster member
-}
-
-func (cs *ClusterStatus) joinInstance(is InstanceStatus, cluster *v1alpha1.GreatDBPaxos) error {
-	// Adding instance to cluster
-	// TODO: 基于clone 或单机备份 添加新节点
-	// stop group_replication; set global super_read_only=0; clone INSTANCE FROM GreatSQL@172.16.16.11:3306 IDENTIFIED BY 'GreatSQL';
-
-	err := cs.rejoinInstance(is, cluster)
+func (cs *ClusterStatus) rejoinInstance(is InstanceStatus, cluster *v1alpha1.GreatDBPaxos) error {
+	err := cs.joinInstance(is, cluster)
 
 	return err
 }
 
-func (cs *ClusterStatus) rejoinInstance(is InstanceStatus, cluster *v1alpha1.GreatDBPaxos) error {
+func (cs *ClusterStatus) joinInstance(is InstanceStatus, cluster *v1alpha1.GreatDBPaxos) error {
 	// Rejoining instance to cluster
 	client, err := is.getInstanceConnect(cluster)
 	if err != nil {
@@ -193,21 +189,6 @@ func (cs *ClusterStatus) rejoinInstance(is InstanceStatus, cluster *v1alpha1.Gre
 		}
 	}
 	return nil
-}
-
-func (cs *ClusterStatus) removeInstance(is InstanceStatus, cluster *v1alpha1.GreatDBPaxos) error {
-	// Removing a cluster instance
-	client, err := is.getInstanceConnect(cluster)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	err = client.Exec("stop group_replication;")
-	if err != nil {
-		dblog.Log.Reason(err).Errorf("Removing a cluster instance %s.%s failure", cluster.Name, is.PodIns.Name)
-	}
-	return err
 }
 
 func (cs *ClusterStatus) initUser(cluster *v1alpha1.GreatDBPaxos) error {
@@ -310,10 +291,16 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 			pod = ins.PodIns
 			break
 		}
+
 		if exist {
+			podReady := false
 			for _, cond := range pod.Status.Conditions {
 				if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
-					cluster.Status.Member[i].Type = v1alpha1.MemberStatusFree
+					podReady = true
+					if cluster.Status.Member[i].Type == "" && ins.State == "" {
+						ins.State = v1alpha1.MemberStatusFree
+					}
+
 					if member.Address != "" {
 						break
 					}
@@ -325,20 +312,26 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 					break
 				}
 			}
+			if !podReady {
+				ins.State = v1alpha1.MemberStatusPending
+			}
 		} else {
-			ins.MemberVersion = cluster.Status.Version
-			ins.State = v1alpha1.MemberStatusUnknown
+			ins.State = v1alpha1.MemberStatusPending
 		}
 
-		if ins.State == v1alpha1.MemberStatusOnline {
+		if ins.State == v1alpha1.MemberStatusOnline && !member.JoinCluster {
 			cluster.Status.Member[i].JoinCluster = true
 		}
 
 		// Same status, only update time
 		if cluster.Status.Member[i].Type == ins.State && string(member.Role) == ins.Role {
-			if now.Sub(cluster.Status.Member[i].LastUpdateTime.Time) > time.Second*20 {
+			if now.Sub(cluster.Status.Member[i].LastUpdateTime.Time) > time.Second*30 {
 				cluster.Status.Member[i].LastUpdateTime = now
 			}
+			continue
+		}
+
+		if cluster.Status.Member[i].Type == v1alpha1.MemberStatusFailure && !GreatdbInstanceStatusNormal(ins.State) {
 			continue
 		}
 
@@ -353,7 +346,7 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 }
 
 func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.GreatDBPaxos) {
-	// 同步集群状态
+
 	clusterStatus := v1alpha1.ClusterStatusFailed
 	switch diag.status {
 	case v1alpha1.ClusterDiagStatusInitializing:
@@ -399,7 +392,9 @@ func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.Gre
 
 	var normalInsNum int32
 	var failureInsNum int32
+	var allInsNum int32
 	for _, member := range cluster.Status.Member {
+		allInsNum++
 		switch member.Type {
 		case v1alpha1.MemberStatusError, v1alpha1.MemberStatusFailure, v1alpha1.MemberStatusOffline, v1alpha1.MemberStatusUnmanaged:
 			failureInsNum += 1
@@ -411,11 +406,12 @@ func (cs *ClusterStatus) publishStatus(diag ClusterStatus, cluster *v1alpha1.Gre
 			}
 		}
 	}
-
+	cluster.Status.CurrentInstances = allInsNum
 	cluster.Status.Instances = cluster.Spec.Instances
 	cluster.Status.ReadyInstances = normalInsNum
 	cluster.Status.AvailableReplicas = normalInsNum + failureInsNum
 	cluster.Status.Port = cluster.Spec.Port
+
 }
 
 func (diagnostic *ClusterStatus) repairCluster(cluster *v1alpha1.GreatDBPaxos) {
@@ -444,6 +440,20 @@ func (diagnostic *ClusterStatus) repairCluster(cluster *v1alpha1.GreatDBPaxos) {
 		}
 		return
 	case v1alpha1.ClusterDiagStatusOnlineUncertain:
+		for _, ins := range diagnostic.AllInstance {
+			cand := DiagnoseClusterCandidate(cluster, ins.PodIns)
+			if cand.state == v1alpha1.CandidateDiagStatusRejoinable {
+				err := diagnostic.rejoinInstance(ins, cluster)
+				if err != nil {
+					dblog.Log.Reason(err).Errorf("Rejoin Instance Failed %s.%s", cluster.Name, ins.PodIns.Name)
+				}
+			} else if cand.state == v1alpha1.CandidateDiagStatusJoinable {
+				err := diagnostic.joinInstance(ins, cluster)
+				if err != nil {
+					dblog.Log.Reason(err).Errorf("Join Instance Failed %s.%s", cluster.Name, ins.PodIns.Name)
+				}
+			}
+		}
 		return
 	case v1alpha1.ClusterDiagStatusOffline:
 		//  Reboot cluster if all pods are reachable
@@ -487,7 +497,7 @@ func GetInstanceConnectToPrimary(cluster *v1alpha1.GreatDBPaxos) (internal.DBCli
 			return clientPrimary, nil
 		}
 	}
-	return nil, fmt.Errorf("Not obtained primary client")
+	return nil, fmt.Errorf("not obtained primary client")
 }
 
 func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineMemberAddress []string) ([][]InstanceStatus, [][]InstanceStatus) {
@@ -498,7 +508,7 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 	// List of group partitions that have no quorum and can't execute transactions.
 	blockedPartitions := make([][]InstanceStatus, 0)
 	noPrimaryActivePartitions := make([][]InstanceStatus, 0)
-	for address, instance := range onlineMemberStatuses {
+	for _, instance := range onlineMemberStatuses {
 		if instance.InQuorum {
 			online_peers := make([]string, 0)
 			for peer, state := range instance.Peers {
@@ -506,11 +516,11 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 					online_peers = append(online_peers, peer)
 				}
 			}
-			missing := SubtractSlices(onlineMemberAddress, online_peers)
-			if len(missing) > 0 {
-				dblog.Log.Errorf("Cluster status results inconsistent: Group view of %s has %s but these are not ONLINE: %s", address, online_peers, missing)
-				return activePartitions, blockedPartitions
-			}
+			// missing := SubtractSlices(onlineMemberAddress, online_peers)
+			// if len(missing) > 0 {
+			// 	dblog.Log.Errorf("Cluster status results inconsistent: Group view of %s has %s but these are not ONLINE: %s", address, online_peers, missing)
+			// 	return activePartitions, blockedPartitions
+			// }
 
 			part := make([]InstanceStatus, 0)
 			for peer, state := range instance.Peers {
@@ -625,7 +635,7 @@ func (is *InstanceStatus) QueryMembershipInfo(client internal.DBClientinterface)
 		&is.MemberVersion, &is.MemberCount, &is.ReachableMemberCount)
 	if err != nil {
 		if strings.Contains(err.Error(), "no rows in result set") {
-			is.State = v1alpha1.MemberStatusOffline
+			is.State = v1alpha1.MemberStatusFree
 			return
 		} else {
 			dblog.Log.Reason(err).Error("failed to query member status")
@@ -760,10 +770,6 @@ func (is *InstanceStatus) checkCondition(condType corev1.PodConditionType) bool 
 	return false
 }
 
-func (is *InstanceStatus) updateMembershipStatus() {
-
-}
-
 func diagnoseInstance(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) (InstanceStatus, error) {
 	is := InstanceStatus{
 		PodIns: pod,
@@ -782,7 +788,7 @@ func diagnoseInstance(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) (Instance
 				is.State = v1alpha1.MemberStatusOffline
 			}
 		} else if strings.Contains(err.Error(), "reason: context deadline exceeded") {
-			if is.PodIns.Status.Phase == "Running" && is.checkContainersReady() && !is.PodIns.DeletionTimestamp.IsZero() {
+			if is.PodIns.Status.Phase == "Running" && is.checkContainersReady() {
 				is.State = v1alpha1.MemberStatusError
 			} else {
 				is.State = v1alpha1.MemberStatusUnknown
@@ -824,7 +830,7 @@ func DiagnoseClusterCandidate(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) C
 		status.state = v1alpha1.CandidateDiagStatusUnreachable
 	} else if is.State == v1alpha1.MemberStatusOnline || is.State == v1alpha1.MemberStatusRecovering {
 		status.state = v1alpha1.CandidateDiagStatusMember
-	} else if is.State == v1alpha1.MemberStatusUnmanaged {
+	} else if is.State == v1alpha1.MemberStatusUnmanaged || is.State == v1alpha1.MemberStatusFree {
 		//check_errant_gtids
 
 		status.badGtidSet, _ = is.checkErrantGtids(cluster)
@@ -910,7 +916,6 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 		clusterStatus.AllInstance = append(clusterStatus.AllInstance, instanceStatus)
 		if err != nil {
 			dblog.Log.Error(err.Error())
-			continue
 		}
 		gtidExecuted[pod.UID] = instanceStatus.gtidUnion
 		// allMemberPods = append(allMemberPods, member)
@@ -918,15 +923,13 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 			onlineMemberAddress = append(onlineMemberAddress, member.Address)
 		}
 
-		if instanceStatus.State == v1alpha1.MemberStatusUnknown {
-			unsurePods = append(unsurePods, member)
-		} else if instanceStatus.State == v1alpha1.MemberStatusOffline || instanceStatus.State == v1alpha1.MemberStatusError || instanceStatus.State == v1alpha1.MemberStatusUnknown {
+		if instanceStatus.State == v1alpha1.MemberStatusOffline || instanceStatus.State == v1alpha1.MemberStatusError || instanceStatus.State == v1alpha1.MemberStatusUnmanaged {
 			offlinePods = append(offlinePods, member)
 		} else if instanceStatus.State == v1alpha1.MemberStatusOnline || instanceStatus.State == v1alpha1.MemberStatusRecovering {
 			onlinePods = append(onlinePods, member)
 			onlineMemberStatuses[member.Address] = instanceStatus
 		} else {
-			dblog.Log.Errorf("instance status invalid: %s", instanceStatus.State)
+			unsurePods = append(unsurePods, member)
 		}
 	}
 	clusterStatus.gtidExecuted = gtidExecuted
@@ -990,16 +993,6 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 	dblog.Log.Infof("Cluster %s  status=%s", cluster.Name, clusterStatus.status)
 
 	return clusterStatus
-}
-
-func (great GreatDBManager) probeMemberStatus(cluster *v1alpha1.GreatDBPaxos, pod *corev1.Pod) {
-	instanceStatus, err := diagnoseInstance(cluster, pod)
-	if err != nil {
-		dblog.Log.Reason(err).Error("failed Instance")
-	}
-	if pod.DeletionTimestamp.IsZero() {
-		instanceStatus.updateMembershipStatus()
-	}
 }
 
 func (great GreatDBManager) probeStatusIfNeeded(cluster *v1alpha1.GreatDBPaxos) (diag ClusterStatus) {

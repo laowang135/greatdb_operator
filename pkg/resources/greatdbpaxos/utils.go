@@ -252,3 +252,13 @@ func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClient
 	return nil, fmt.Errorf("no available connections")
 
 }
+
+func GreatdbInstanceStatusNormal(status v1alpha1.MemberConditionType) bool {
+
+	if status == v1alpha1.MemberStatusOnline || status == v1alpha1.MemberStatusRecovering {
+		return true
+	}
+
+	return false
+
+}

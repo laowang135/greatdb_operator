@@ -64,6 +64,7 @@ func (GreatDBManager) removeMember(cluster *v1alpha1.GreatDBPaxos, name string) 
 
 	for _, member := range cluster.Status.Member {
 		if member.Name == name {
+			cluster.Status.CurrentInstances -= 1
 			continue
 		}
 		memberList = append(memberList, member)

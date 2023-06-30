@@ -7,6 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // SetDefaultFields  Set the default configuration of cluster objects
@@ -124,6 +125,22 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 
 	if cluster.Spec.Port == 0 {
 		cluster.Spec.Port = 3306
+	}
+	maxUnavailable := intstr.FromInt(0)
+	if cluster.Spec.FailOver.MaxUnavailable == nil {
+		cluster.Spec.FailOver.MaxUnavailable = &maxUnavailable
+		update = true
+	}
+
+	if cluster.Spec.FailOver.Enable == nil {
+		update = true
+		cluster.Spec.FailOver.Enable = &update
+	}
+
+	if cluster.Spec.FailOver.AutoScaleiIn == nil {
+		update = true
+		scaleIn := false
+		cluster.Spec.FailOver.AutoScaleiIn = &scaleIn
 	}
 
 	if cluster.Spec.Resources.Requests == nil {

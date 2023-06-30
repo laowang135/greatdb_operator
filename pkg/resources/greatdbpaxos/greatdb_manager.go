@@ -50,6 +50,10 @@ func (great *GreatDBManager) Sync(cluster *v1alpha1.GreatDBPaxos) (err error) {
 		return err
 	}
 
+	if err = great.failover(cluster); err != nil {
+		return err
+	}
+
 	return nil
 
 }
@@ -778,6 +782,7 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			return nil
 		}
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosBootCluster, "")
+		return nil
 
 	case v1alpha1.GreatDBPaxosBootCluster:
 
@@ -785,12 +790,14 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			return err
 		}
 		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosInitUser, "")
+		return nil
 
 	case v1alpha1.GreatDBPaxosInitUser:
 		if err := diag.initUser(cluster); err != nil {
 			return err
 		}
-		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosSucceeded, "")
+		UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
+		return nil
 
 	case v1alpha1.GreatDBPaxosReady:
 		// pause
@@ -826,6 +833,7 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 			diag.repairCluster(cluster)
 		}
 
+		return nil
 	case v1alpha1.GreatDBPaxosScaleOut:
 		if cluster.Status.TargetInstances == cluster.Status.CurrentInstances && cluster.Status.ReadyInstances == cluster.Status.Instances {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
@@ -834,6 +842,19 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 		if cluster.Status.TargetInstances == cluster.Status.CurrentInstances && cluster.Status.ReadyInstances == cluster.Status.Instances {
 			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
+
+	case v1alpha1.GreatDBPaxosFailover:
+		if cluster.Status.TargetInstances == cluster.Status.CurrentInstances && cluster.Status.ReadyInstances == cluster.Status.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosFailoverSucceeded, "")
+		}
+
+	case v1alpha1.GreatDBPaxosFailoverSucceeded:
+		if cluster.Status.TargetInstances == cluster.Spec.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
+			break
+		}
+		diag.repairCluster(cluster)
+		return nil
 	}
 
 	if cluster.Status.ReadyInstances < cluster.Status.Instances {

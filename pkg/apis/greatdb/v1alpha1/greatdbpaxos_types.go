@@ -20,6 +20,7 @@ import (
 	// appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type User struct {
@@ -130,6 +131,33 @@ type ScaleOut struct {
 	// +kubebuilder:validation:Enum="backup";"clone"
 	// +optional
 	Source ScaleOutSourceType `json:"source,omitempty"`
+}
+
+type FailOver struct {
+
+	// Enable failover function, default: true
+	// +kubebuilder:default=true
+	Enable *bool `json:"enable,omitempty"`
+
+	// Maximum number of recoverable instances
+	// +kubebuilder:default=3
+	// +optional
+	MaxInstance int32 `json:"maxInstance,omitempty"`
+
+	// The period of failover after the greatdb instance fails
+	// +kubebuilder:default="10m"
+	// +optional
+	Period string `json:"failoverPeriod,omitempty"`
+	// An eviction is allowed if at most "maxUnavailable" pods selected by
+	// "selector" are unavailable after the eviction, i.e. even in absence of
+	// the evicted pod. For example, one can prevent all voluntary evictions
+	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,3,opt,name=maxUnavailable"`
+
+	// Whether to automatically shrink the expansion node after the recovery of the faulty node, default： false
+	// +kubebuilder:default=false
+	AutoScaleiIn *bool `json:"autoScaleiIn,omitempty"`
 }
 
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
@@ -252,6 +280,9 @@ type GreatDBPaxosSpec struct {
 	// Expansion and contraction configuration
 	// +optional
 	Scaling *Scaling `json:"scaling,omitempty"`
+
+	// Failover Configuration
+	FailOver FailOver `json:"failOver,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.
