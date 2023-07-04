@@ -98,7 +98,7 @@ func NewControllerCommand() *cobra.Command {
 	fs := cmd.Flags()
 	fs.AddFlagSet(AddFlag())
 	log.InitializeLogging("greatdb-operator")
-	log.Log.SetVerbosityLevel(config.LogLever)
+	_ = log.Log.SetVerbosityLevel(config.LogLever)
 
 	return cmd
 

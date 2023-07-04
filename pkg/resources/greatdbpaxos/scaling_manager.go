@@ -132,7 +132,7 @@ func (great GreatDBManager) ScaleIn(cluster *v1alpha1.GreatDBPaxos) error {
 		member := great.getScaleInMember(cluster)
 		great.ScaleInMember(cluster, member.Name)
 
-		great.stopGroupReplication(cluster, member)
+		_ = great.stopGroupReplication(cluster, member)
 
 		err := great.DeleteFinalizers(cluster.Namespace, member.PvcName)
 		if err != nil {

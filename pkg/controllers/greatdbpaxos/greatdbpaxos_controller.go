@@ -116,7 +116,7 @@ func NewGreatDBClusterController(
 
 }
 
-func (ctrl *GreatDBClusterController) Run(threading int, stopCh <-chan struct{}) error {
+func (ctrl *GreatDBClusterController) Run(threading int, stopCh <-chan struct{}) {
 	// Capture crash
 	defer utilruntime.HandleCrash()
 	// close the queue
@@ -126,7 +126,8 @@ func (ctrl *GreatDBClusterController) Run(threading int, stopCh <-chan struct{})
 
 	dblog.Log.V(2).Info("waiting for informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, ctrl.GreatdbClusterSynced); !ok {
-		return fmt.Errorf("failed to wait for cache to sync")
+		dblog.Log.Error("failed to wait for cache to sync")
+		return
 	}
 
 	dblog.Log.V(2).Info("Starting workers")
@@ -138,7 +139,6 @@ func (ctrl *GreatDBClusterController) Run(threading int, stopCh <-chan struct{})
 
 	<-stopCh
 	dblog.Log.Info("shutting down greatdb-cluster controller workers")
-	return nil
 
 }
 

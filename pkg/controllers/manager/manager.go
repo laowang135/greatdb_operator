@@ -62,6 +62,7 @@ func (mgr *QueueManager) Add(key string, lock bool) bool {
 			if now.Sub(record) > time.Minute {
 				index = i
 				more = true
+				continue
 			}
 			break
 		}

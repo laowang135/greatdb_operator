@@ -14,11 +14,24 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	GreatDBClusterGroupVersionKind = schema.GroupVersionKind{Group: GroupVersion.Group, Version: GroupVersion.Version, Kind: "GreatDBPaxos"}
-)
+	GreatDBPaxosGroupVersionKind     = schema.GroupVersionKind{Group: GroupVersion.Group, Version: GroupVersion.Version, Kind: "GreatDBPaxos"}
+	GreatDBPaxosGroupVersionResource = metav1.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "greatdbpaxoses",
+	}
 
-var GreatDBClusterGroupVersionResource = metav1.GroupVersionResource{
-	Group:    GroupVersion.Group,
-	Version:  GroupVersion.Version,
-	Resource: "greatdbpaxoses",
-}
+	GreatDBBackupScheduleGroupVersionKind     = schema.GroupVersionKind{Group: GroupVersion.Group, Version: GroupVersion.Version, Kind: "GreatDBBackupSchedule"}
+	GreatDBBackupScheduleGroupVersionResource = metav1.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "greatdbbackupschedules",
+	}
+
+	GreatDBBackupRecordGroupVersionKind     = schema.GroupVersionKind{Group: GroupVersion.Group, Version: GroupVersion.Version, Kind: "GreatDBBackupRecord"}
+	GreatDBBackupRecordGroupVersionResource = metav1.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "greatdbbackuprecords",
+	}
+)

@@ -107,6 +107,9 @@ spec:
                     description: The storage type used for backup. When selecting
                       the NFS type, nfs must be specified for backup when creating
                       the cluster, otherwise it cannot be backed up
+                    enum:
+                    - s3
+                    - nfs
                     type: string
                 required:
                 - type

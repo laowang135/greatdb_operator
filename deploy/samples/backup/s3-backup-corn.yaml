@@ -3,7 +3,7 @@ kind: GreatDBBackupSchedule
 metadata:
   name: s3-backup-corn
 spec:
-  clusterName: greatdb-sample
+  clusterName: greatdb-sample1
   schedulers:
   - name: test-s3
     backupType: full

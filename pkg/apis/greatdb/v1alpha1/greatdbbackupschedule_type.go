@@ -49,6 +49,11 @@ type GreatDBBackupScheduleStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	//  This flag tells the controller to suspend subsequent executions, it does
+	// not apply to already started executions. Defaults to false.
+	// +optional
+	Suspend bool `json:"suspend,omitempty"`
+
 	// Current application plan
 	// +optional
 	Schedulers []BackupScheduler `json:"schedulers,omitempty"`
@@ -98,6 +103,7 @@ type BackupScheduler struct {
 type BackupStorageSpec struct {
 	// The storage type used for backup. When selecting the NFS type, nfs must be specified for backup when creating the cluster, otherwise it cannot be backed up
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum="s3";"nfs"
 	Type BackupStorageType `json:"type"`
 
 	// S3 storage

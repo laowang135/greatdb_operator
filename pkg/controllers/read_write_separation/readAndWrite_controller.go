@@ -96,7 +96,7 @@ func NewReadAndWriteController(
 
 }
 
-func (ctrl *ReadAndWriteController) Run(threading int, stopCh <-chan struct{}) error {
+func (ctrl *ReadAndWriteController) Run(threading int, stopCh <-chan struct{}) {
 	// Capture crash
 	defer utilruntime.HandleCrash()
 	// close the queue
@@ -111,7 +111,6 @@ func (ctrl *ReadAndWriteController) Run(threading int, stopCh <-chan struct{}) e
 
 	<-stopCh
 	dblog.Log.Info("shutting down read_write_controller controller workers")
-	return nil
 
 }
 
