@@ -49,3 +49,67 @@ webhooks:
     failurePolicy: "Fail"
     sideEffects: None
     timeoutSeconds: 10
+  - name: greatdbbackup-valitaing-create.greatdb.com
+    rules:
+    - apiGroups:   ["greatdb.com"]
+      apiVersions: ["v1alpha1"]
+      operations:  ["CREATE"]
+      resources:   ["greatdbbackuprecords"]
+    clientConfig:
+      service:
+        namespace: "default"
+        name: "greatdbpaxos-validating"
+        path: "/greatdbbackup-validate-create"
+      caBundle: ${CA_BUNDLE}
+    admissionReviewVersions: [ "v1beta1" ]
+    failurePolicy: "Fail"
+    sideEffects: None
+    timeoutSeconds: 10
+  - name: greatdbbackup-valitaing-update.greatdb.com
+    rules:
+    - apiGroups: [ "greatdb.com" ]
+      apiVersions: [ "v1alpha1" ]
+      operations: [ "UPDATE" ]
+      resources: [ "greatdbbackuprecords" ]
+    clientConfig:
+      service:
+        namespace: "default"
+        name: "greatdbpaxos-validating"
+        path: "/greatdbbackup-validate-update"
+      caBundle: ${CA_BUNDLE}
+    admissionReviewVersions: ["v1beta1"]
+    failurePolicy: "Fail"
+    sideEffects: None
+    timeoutSeconds: 10
+  - name: greatdbbackupschedule-valitaing-create.greatdb.com
+    rules:
+    - apiGroups:   ["greatdb.com"]
+      apiVersions: ["v1alpha1"]
+      operations:  ["CREATE"]
+      resources:   ["greatdbbackupschedules"]
+    clientConfig:
+      service:
+        namespace: "default"
+        name: "greatdbpaxos-validating"
+        path: "/greatdbbackupschedule-validate-create"
+      caBundle: ${CA_BUNDLE}
+    admissionReviewVersions: [ "v1beta1" ]
+    failurePolicy: "Fail"
+    sideEffects: None
+    timeoutSeconds: 10
+  - name: greatdbbackupschedule-valitaing-update.greatdb.com
+    rules:
+    - apiGroups: [ "greatdb.com" ]
+      apiVersions: [ "v1alpha1" ]
+      operations: [ "UPDATE" ]
+      resources: [ "greatdbbackupschedules" ]
+    clientConfig:
+      service:
+        namespace: "default"
+        name: "greatdbpaxos-validating"
+        path: "/greatdbbackupschedule-validate-update"
+      caBundle: ${CA_BUNDLE}
+    admissionReviewVersions: ["v1beta1"]
+    failurePolicy: "Fail"
+    sideEffects: None
+    timeoutSeconds: 10

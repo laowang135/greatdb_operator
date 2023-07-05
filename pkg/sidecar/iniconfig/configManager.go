@@ -125,7 +125,7 @@ func (i *IniParser) SaveToString() string {
 		return ""
 	}
 	wr := &WriteData{}
-	i.configReader.WriteTo(wr)
+	_, _ = i.configReader.WriteTo(wr)
 	return wr.data
 
 }

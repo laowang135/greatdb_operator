@@ -510,12 +510,12 @@ func findGroupPartitions(onlineMemberStatuses map[string]InstanceStatus, onlineM
 	noPrimaryActivePartitions := make([][]InstanceStatus, 0)
 	for _, instance := range onlineMemberStatuses {
 		if instance.InQuorum {
-			online_peers := make([]string, 0)
-			for peer, state := range instance.Peers {
-				if state == string(v1alpha1.MemberStatusOnline) || state == string(v1alpha1.MemberStatusRecovering) {
-					online_peers = append(online_peers, peer)
-				}
-			}
+			// online_peers := make([]string, 0)
+			// for peer, state := range instance.Peers {
+			// 	if state == string(v1alpha1.MemberStatusOnline) || state == string(v1alpha1.MemberStatusRecovering) {
+			// 		online_peers = append(online_peers, peer)
+			// 	}
+			// }
 			// missing := SubtractSlices(onlineMemberAddress, online_peers)
 			// if len(missing) > 0 {
 			// 	dblog.Log.Errorf("Cluster status results inconsistent: Group view of %s has %s but these are not ONLINE: %s", address, online_peers, missing)

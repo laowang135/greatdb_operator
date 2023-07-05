@@ -93,8 +93,8 @@ func ValidateRequestResource(request v1.GroupVersionResource, group string, reso
 }
 
 func GetGreatDBClusterFromAdmissionReview(ar *admissionv1.AdmissionReview) (new *v1alpha1.GreatDBPaxos, old *v1alpha1.GreatDBPaxos, err error) {
-	if !ValidateRequestResource(ar.Request.Resource, v1alpha1.GreatDBClusterGroupVersionKind.Group, v1alpha1.GreatDBClusterGroupVersionResource.Resource) {
-		return nil, nil, fmt.Errorf("expect resource to be '%s'", v1alpha1.GreatDBClusterGroupVersionResource.Resource)
+	if !ValidateRequestResource(ar.Request.Resource, v1alpha1.GreatDBPaxosGroupVersionKind.Group, v1alpha1.GreatDBPaxosGroupVersionResource.Resource) {
+		return nil, nil, fmt.Errorf("expect resource to be '%s'", v1alpha1.GreatDBPaxosGroupVersionResource.Resource)
 	}
 
 	raw := ar.Request.Object.Raw
@@ -107,14 +107,68 @@ func GetGreatDBClusterFromAdmissionReview(ar *admissionv1.AdmissionReview) (new 
 
 	if ar.Request.Operation == admissionv1.Update {
 		raw := ar.Request.OldObject.Raw
-		oldVMI := v1alpha1.GreatDBPaxos{}
+		oldCluster := v1alpha1.GreatDBPaxos{}
 
-		err = json.Unmarshal(raw, &oldVMI)
+		err = json.Unmarshal(raw, &oldCluster)
 		if err != nil {
 			return nil, nil, err
 		}
-		return &newGreatdb, &oldVMI, nil
+		return &newGreatdb, &oldCluster, nil
 	}
 
 	return &newGreatdb, nil, nil
+}
+
+func GetGreatDBBackupRecordFromAdmissionReview(ar *admissionv1.AdmissionReview) (new *v1alpha1.GreatDBBackupRecord, old *v1alpha1.GreatDBBackupRecord, err error) {
+	if !ValidateRequestResource(ar.Request.Resource, v1alpha1.GreatDBBackupRecordGroupVersionKind.Group, v1alpha1.GreatDBBackupRecordGroupVersionResource.Resource) {
+		return nil, nil, fmt.Errorf("expect resource to be '%s'", v1alpha1.GreatDBBackupRecordGroupVersionResource.Resource)
+	}
+
+	raw := ar.Request.Object.Raw
+	newRecord := v1alpha1.GreatDBBackupRecord{}
+
+	err = json.Unmarshal(raw, &newRecord)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if ar.Request.Operation == admissionv1.Update {
+		raw := ar.Request.OldObject.Raw
+		oldRecord := v1alpha1.GreatDBBackupRecord{}
+
+		err = json.Unmarshal(raw, &oldRecord)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &newRecord, &oldRecord, nil
+	}
+
+	return &newRecord, nil, nil
+}
+
+func GetGreatDBBackupScheduleFromAdmissionReview(ar *admissionv1.AdmissionReview) (new *v1alpha1.GreatDBBackupSchedule, old *v1alpha1.GreatDBBackupSchedule, err error) {
+	if !ValidateRequestResource(ar.Request.Resource, v1alpha1.GreatDBBackupScheduleGroupVersionKind.Group, v1alpha1.GreatDBBackupScheduleGroupVersionResource.Resource) {
+		return nil, nil, fmt.Errorf("expect resource to be '%s'", v1alpha1.GreatDBBackupScheduleGroupVersionResource.Resource)
+	}
+
+	raw := ar.Request.Object.Raw
+	newSchedule := v1alpha1.GreatDBBackupSchedule{}
+
+	err = json.Unmarshal(raw, &newSchedule)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if ar.Request.Operation == admissionv1.Update {
+		raw := ar.Request.OldObject.Raw
+		oldSchedule := v1alpha1.GreatDBBackupSchedule{}
+
+		err = json.Unmarshal(raw, &oldSchedule)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &newSchedule, &oldSchedule, nil
+	}
+
+	return &newSchedule, nil, nil
 }

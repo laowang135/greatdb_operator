@@ -94,7 +94,7 @@ func NewGreatDBBackupScheduleController(
 
 }
 
-func (ctrl *GreatDBBackupScheduleController) Run(threading int, stopCh <-chan struct{}) error {
+func (ctrl *GreatDBBackupScheduleController) Run(threading int, stopCh <-chan struct{}) {
 	// Capture crash
 	defer utilruntime.HandleCrash()
 	// close the queue
@@ -104,7 +104,8 @@ func (ctrl *GreatDBBackupScheduleController) Run(threading int, stopCh <-chan st
 
 	dblog.Log.V(2).Info("waiting for backup-scheduler informer caches to sync")
 	if ok := cache.WaitForCacheSync(stopCh, ctrl.GreatDBBackupScheduleSynced); !ok {
-		return fmt.Errorf("failed to wait for cache to sync")
+		dblog.Log.Error("failed to wait for cache to sync")
+		return
 	}
 
 	dblog.Log.V(2).Info("Starting workers")
@@ -114,7 +115,6 @@ func (ctrl *GreatDBBackupScheduleController) Run(threading int, stopCh <-chan st
 
 	<-stopCh
 	dblog.Log.Info("shutting down greatdb-backup-scheduler controller workers")
-	return nil
 
 }
 
@@ -185,7 +185,7 @@ func (ctrl *GreatDBBackupScheduleController) Sync(key string) error {
 		}
 	}
 
-	if schedule.Spec.Suspend {
+	if schedule.Spec.Suspend && (schedule.Spec.Suspend == schedule.Status.Suspend) {
 		dblog.Log.Infof("backup %s/%s is in manual maintenance mode. In this mode, the operator will not perform status synchronization", schedule.Namespace, schedule.Name)
 		return nil
 	}

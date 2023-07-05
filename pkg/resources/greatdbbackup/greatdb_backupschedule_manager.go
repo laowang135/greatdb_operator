@@ -8,6 +8,7 @@ import (
 	dblog "greatdb-operator/pkg/utils/log"
 	"greatdb-operator/pkg/utils/tools"
 
+	"github.com/robfig/cron/v3"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
@@ -63,7 +64,8 @@ func (great GreatDBBackupScheduleManager) syncGreatDBBackUpScheduler(backupSched
 			deleteScheduleList = append(deleteScheduleList, name)
 
 		}
-	} else {
+	} else if !backupSchedule.Spec.Suspend {
+
 		nameMap := make(map[string]struct{})
 		for _, bcp := range backupSchedule.Spec.Schedulers {
 			if bcp.Name == "" {
@@ -120,6 +122,12 @@ func (great GreatDBBackupScheduleManager) syncGreatDBBackUpScheduler(backupSched
 				deleteScheduleList = append(deleteScheduleList, name)
 				del = true
 			}
+			nameMap[name] = struct{}{}
+
+			_, err := cron.ParseStandard(bcp.Schedule)
+			if err != nil {
+				continue
+			}
 
 			if !ok || del {
 				jobID, err := cronMgr.AddFuncWithSeconds(bcp.Schedule, SyncBackupSchedule(&cronMgr, backupSchedule, bcp))
@@ -134,7 +142,6 @@ func (great GreatDBBackupScheduleManager) syncGreatDBBackUpScheduler(backupSched
 				})
 			}
 
-			nameMap[name] = struct{}{}
 		}
 
 		for i, scheduler := range backupSchedule.Status.Schedulers {
@@ -147,6 +154,28 @@ func (great GreatDBBackupScheduleManager) syncGreatDBBackUpScheduler(backupSched
 			}
 
 		}
+
+	}
+
+	if backupSchedule.Spec.Suspend {
+		for i, scheduler := range backupSchedule.Status.Schedulers {
+			if scheduler.Name == "" {
+				continue
+			}
+			name := getBackupScheduleName(backupSchedule, scheduler)
+			if !reflect.DeepEqual(scheduler, backupSchedule.Spec.Schedulers[i]) {
+				deleteScheduleList = append(deleteScheduleList, name)
+			}
+
+		}
+
+		// Remove the modified backup plan
+		for _, name := range deleteScheduleList {
+			deleteBackupSchedule(&cronMgr, name)
+		}
+		backupSchedule.Status.Message = "all backup plans have been stopped"
+		backupSchedule.Status.Schedulers = nil
+		return nil
 
 	}
 

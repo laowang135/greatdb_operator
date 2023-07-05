@@ -14,7 +14,7 @@ import (
 )
 
 type ControllerInterface interface {
-	Run(threading int, stopCh <-chan struct{}) error
+	Run(threading int, stopCh <-chan struct{})
 }
 
 type ControllerSet map[string]*ControllerRun

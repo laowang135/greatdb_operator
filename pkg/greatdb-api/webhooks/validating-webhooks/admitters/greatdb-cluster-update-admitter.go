@@ -117,7 +117,6 @@ func ValidatingUpdateService(field *k8sfield.Path, cluster, oldCluster *v1alpha1
 	var readEquation bool
 	if cluster.Spec.Service.ReadPort == oldCluster.Spec.Service.ReadPort {
 		readEquation = true
-		return causes
 	}
 	writeQeuation := false
 	if cluster.Spec.Service.WritePort == oldCluster.Spec.Service.WritePort {

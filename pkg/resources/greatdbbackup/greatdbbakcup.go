@@ -91,7 +91,7 @@ func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBac
 
 	now := resources.GetNowTime().Format("20060102150405")
 	recordName := fmt.Sprintf("%s-%s-%s-%s", scheduler.BackupResource, scheduler.BackupType, greatdbbackup.Name, now)
-	_, err := r.Client.Clientset.GreatdbV1alpha1().GreatDBBackupSchedules(greatdbbackup.Namespace).Get(context.TODO(), greatdbbackup.Name, metav1.GetOptions{})
+	sch, err := r.Client.Clientset.GreatdbV1alpha1().GreatDBBackupSchedules(greatdbbackup.Namespace).Get(context.TODO(), greatdbbackup.Name, metav1.GetOptions{})
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			name := getBackupScheduleName(greatdbbackup, scheduler)
@@ -115,7 +115,7 @@ func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBac
 		},
 		Spec: v1alpha1.GreatDBBackupRecordSpec{
 			ClusterName:    greatdbbackup.Spec.ClusterName,
-			InstanceName:   greatdbbackup.Spec.InstanceName,
+			InstanceName:   sch.Spec.InstanceName,
 			BackupType:     scheduler.BackupType,
 			BackupResource: scheduler.BackupResource,
 			SelectStorage:  scheduler.SelectStorage,

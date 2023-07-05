@@ -108,6 +108,9 @@ spec:
                           description: The storage type used for backup. When selecting
                             the NFS type, nfs must be specified for backup when creating
                             the cluster, otherwise it cannot be backed up
+                          enum:
+                          - s3
+                          - nfs
                           type: string
                       required:
                       - type
@@ -191,6 +194,9 @@ spec:
                           description: The storage type used for backup. When selecting
                             the NFS type, nfs must be specified for backup when creating
                             the cluster, otherwise it cannot be backed up
+                          enum:
+                          - s3
+                          - nfs
                           type: string
                       required:
                       - type
@@ -201,6 +207,11 @@ spec:
                   - name
                   type: object
                 type: array
+              suspend:
+                description: This flag tells the controller to suspend subsequent
+                  executions, it does not apply to already started executions. Defaults
+                  to false.
+                type: boolean
             type: object
         type: object
     served: true
