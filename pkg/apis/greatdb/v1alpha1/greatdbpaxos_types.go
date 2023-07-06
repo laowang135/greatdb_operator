@@ -160,6 +160,20 @@ type FailOver struct {
 	AutoScaleiIn *bool `json:"autoScaleiIn,omitempty"`
 }
 
+type CloneSource struct {
+	// The namespace where the clone source is located, The namespace where the clone source is located, defaults to the command space set by the cluster
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// To clone the source (data source),
+	// it is necessary to ensure that the cluster has a successful backup record and that the storage configuration remains consistent
+	ClusterName string `json:"clusterName,omitempty"`
+
+	// Backup records, priority higher than ClusterName
+	// +optional
+	BackupRecordName string `json:"backupRecordName,omitempty"`
+}
+
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
 type GreatDBPaxosSpec struct {
 	// set cluster affinity
@@ -203,9 +217,9 @@ type GreatDBPaxosSpec struct {
 	// +optional
 	ClusterDomain string `json:"clusterDomain,omitempty"`
 
-	// number of instances of the GreatDBPaxos
+	// number of instances of the GreatDBPaxos, default:3
 	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=3
+	// +kubebuilder:validation:Minimum=2
 	// +optional
 	Instances int32 `json:"instances,omitempty"`
 
@@ -283,6 +297,10 @@ type GreatDBPaxosSpec struct {
 
 	// Failover Configuration
 	FailOver FailOver `json:"failOver,omitempty"`
+
+	// Configure the clone source and create a new cluster based on existing data
+	// +optional
+	CloneSource *CloneSource `json:"cloneSource,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.
@@ -449,6 +467,8 @@ type GreatDBPaxosStatus struct {
 	// User initialization result record
 	// +optional
 	Users []User `json:"users,omitempty"`
+
+	CloneSource CloneSource `json:"cloneSource,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

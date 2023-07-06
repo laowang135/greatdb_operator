@@ -17,7 +17,7 @@ func (great GreatDBWebhookServer) registerValidatingWebhooks(kubeClient kubernet
 
 	// greatdbpaxos
 	http.HandleFunc(utils.GreatDBCreateValidatePath, func(w http.ResponseWriter, r *http.Request) {
-		validating_webhooks.ServeGreatDBPaxosCreate(w, r, kubeClient)
+		validating_webhooks.ServeGreatDBPaxosCreate(w, r, kubeClient, greatdbClient)
 	})
 	http.HandleFunc(utils.GreatDBUpdateValidatePath, func(w http.ResponseWriter, r *http.Request) {
 		validating_webhooks.ServeGreatDBPaxosUpdate(w, r, kubeClient, greatdbClient)

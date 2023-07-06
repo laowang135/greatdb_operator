@@ -224,16 +224,14 @@ func (ret SecretManager) SetDefaultData(secret *corev1.Secret, cluster *v1alpha1
 		secret.Data = map[string][]byte{}
 	}
 
-	if cluster.Status.Phase == v1alpha1.GreatDBPaxosPending {
-		if _, ok := secret.Data[resources.ClusterUserKey]; ok {
-			delete(secret.Data, resources.ClusterUserKey)
-			needUpdate = true
-		}
+	if _, ok := secret.Data[resources.ClusterUserKey]; ok {
+		delete(secret.Data, resources.ClusterUserKey)
+		needUpdate = true
+	}
 
-		if _, ok := secret.Data[resources.ClusterUserPasswordKey]; ok {
-			delete(secret.Data, resources.ClusterUserPasswordKey)
-			needUpdate = true
-		}
+	if _, ok := secret.Data[resources.ClusterUserPasswordKey]; ok {
+		delete(secret.Data, resources.ClusterUserPasswordKey)
+		needUpdate = true
 	}
 
 	data := ret.getDefaultSecretData(cluster)

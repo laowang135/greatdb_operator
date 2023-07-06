@@ -43,6 +43,7 @@ func ValidatingGreatDBClusterUpdateSpec(field *k8sfield.Path, cluster, oldCluste
 	causes = append(causes, ValidatingImagePullSecrets(field.Child("imagePullSecrets"), cluster.Namespace, cluster.Spec.ImagePullSecrets, kubeClient)...)
 	causes = append(causes, ValidatingUpdateService(field.Child("service"), cluster, oldCluster, kubeClient)...)
 	causes = append(causes, ValidatingUpdatePort(field.Child("port"), cluster, oldCluster)...)
+	causes = append(causes, ValidatingCloneSource(field.Child("cloneSource"), cluster.Namespace, cluster.Spec.CloneSource, greatdbClient)...)
 	return causes
 }
 

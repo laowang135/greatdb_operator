@@ -10,8 +10,8 @@ import (
 	"greatdb-operator/pkg/greatdb-api/webhooks/validating-webhooks/admitters"
 )
 
-func ServeGreatDBPaxosCreate(resp http.ResponseWriter, req *http.Request, kubeClient kubernetes.Interface) {
-	utils.Serve(resp, req, &admitters.GreatDBClusterCreateAdmitter{Client: kubeClient})
+func ServeGreatDBPaxosCreate(resp http.ResponseWriter, req *http.Request, kubeClient kubernetes.Interface, greatdbClient versioned.Interface) {
+	utils.Serve(resp, req, &admitters.GreatDBClusterCreateAdmitter{Client: kubeClient, GreatDBClient: greatdbClient})
 }
 
 func ServeGreatDBPaxosUpdate(resp http.ResponseWriter, req *http.Request, kubeClient kubernetes.Interface, greatdbClient versioned.Interface) {

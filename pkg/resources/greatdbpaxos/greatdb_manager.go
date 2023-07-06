@@ -295,9 +295,9 @@ func (great GreatDBManager) GetPodSpec(cluster *v1alpha1.GreatDBPaxos, member v1
 
 // newGreatDBInitContainers
 func (great GreatDBManager) newGreatDBInitContainers(cluster *v1alpha1.GreatDBPaxos, member v1alpha1.MemberCondition) (containers []corev1.Container, err error) {
-
+	var lastBackuprecord *v1alpha1.GreatDBBackupRecord
 	if member.CreateType == v1alpha1.ScaleCreateMember || member.CreateType == v1alpha1.FailOverCreateMember {
-		var lastBackuprecord *v1alpha1.GreatDBBackupRecord
+
 		if cluster.Spec.Scaling.ScaleOut.Source == v1alpha1.ScaleOutSourceBackup {
 			lastBackuprecord = great.getLatestSuccessfulBackup(cluster.Namespace, cluster.Name, string(v1alpha1.GreatDBBackupResourceType))
 		}
@@ -343,6 +343,50 @@ func (great GreatDBManager) newGreatDBInitContainers(cluster *v1alpha1.GreatDBPa
 			db := great.newGreatDBBackupContainers(lastBackuprecord, cluster)
 			containers = append(containers, db)
 		}
+
+	}
+
+	if member.CreateType == v1alpha1.InitCreateMember && cluster.Spec.CloneSource != nil {
+
+		if cluster.Spec.CloneSource.ClusterName == "" && cluster.Spec.CloneSource.BackupRecordName == "" {
+			return containers, nil
+		}
+
+		ns := cluster.Spec.CloneSource.Namespace
+		if ns == "" {
+			ns = cluster.Namespace
+		}
+		cluster.Status.CloneSource.Namespace = ns
+
+		clusterName := cluster.Status.CloneSource.ClusterName
+		if clusterName == "" {
+			clusterName = cluster.Spec.CloneSource.ClusterName
+		}
+
+		recordName := cluster.Status.CloneSource.BackupRecordName
+		if recordName == "" {
+			recordName = cluster.Spec.CloneSource.BackupRecordName
+		}
+
+		if recordName == "" {
+
+			lastBackuprecord = great.getLatestSuccessfulBackup(ns, clusterName, string(v1alpha1.GreatDBBackupResourceType))
+			if lastBackuprecord == nil {
+				return containers, fmt.Errorf("the clone source does not have a completed backup record")
+			}
+			cluster.Status.CloneSource.ClusterName = clusterName
+		} else {
+			lastBackuprecord, err = great.Lister.BackupRecordLister.GreatDBBackupRecords(ns).Get(recordName)
+			if err != nil {
+				dblog.Log.Reason(err).Error("failed to get GreatDBBackupRecords")
+				return containers, err
+			}
+			cluster.Status.CloneSource.ClusterName = clusterName
+		}
+
+		cluster.Status.CloneSource.BackupRecordName = lastBackuprecord.Name
+		db := great.newGreatDBBackupContainers(lastBackuprecord, cluster)
+		containers = append(containers, db)
 
 	}
 

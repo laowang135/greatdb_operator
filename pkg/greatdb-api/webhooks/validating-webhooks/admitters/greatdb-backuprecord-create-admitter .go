@@ -36,7 +36,7 @@ func ValidatingGreatDBBackupRecordSpec(field *k8sfield.Path, ns string, spec v1a
 	causes = append(causes, ValidatingClusterName(field.Child("clusterName"), ns, spec.ClusterName, greatDBClient)...)
 	causes = append(causes, ValidatingBackupRecord(field.Child("schedulers"), ns, spec.ClusterName, spec, greatDBClient)...)
 	causes = append(causes, ValidatingInstanceName(field.Child("instanceName"), ns, spec.ClusterName, spec.InstanceName, greatDBClient)...)
-	causes = append(causes, ValidatingBackupRecordInstanceIsEmpty(field.Child("instanceName"), spec.InstanceName)...)
+	// causes = append(causes, ValidatingBackupRecordInstanceIsEmpty(field.Child("instanceName"), spec.InstanceName)...)
 	return causes
 
 }

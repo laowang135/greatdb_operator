@@ -399,13 +399,14 @@ func (great GreatDBBackupRecordManager) UpdateGreatDBBackupRecordStatus(backupre
 	case job.Status.Active == 1:
 		backuprecord.Status.Status = v1alpha1.GreatDBBackupRecordConditionRunning
 	case job.Status.Succeeded == 1:
-		backuprecord.Status.Status = v1alpha1.GreatDBBackupRecordConditionSuccess
-		backuprecord.Status.CompletedAt = job.Status.CompletionTime
+
 		err := great.getBackupInfo(backuprecord, cluster.Spec.ClusterDomain)
 		if err != nil {
 			dblog.Log.Error(err.Error())
 			return err
 		}
+		backuprecord.Status.Status = v1alpha1.GreatDBBackupRecordConditionSuccess
+		backuprecord.Status.CompletedAt = job.Status.CompletionTime
 
 	case job.Status.Failed > 1:
 		backuprecord.Status.Status = v1alpha1.GreatDBBackupRecordConditionError

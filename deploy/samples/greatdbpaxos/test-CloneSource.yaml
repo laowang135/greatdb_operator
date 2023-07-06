@@ -1,0 +1,66 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBPaxos
+metadata:
+  name: greatdb-test
+spec:
+  backup:
+    enable: true
+    nfs:
+      path: /home/nfs/
+      server: 172.17.120.143
+    resources:
+      limits:
+        cpu: "2"
+        memory: 2Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+  clusterDomain: cluster.local
+  delete: {}
+  failOver:
+    autoScaleiIn: false
+    enable: true
+    failoverPeriod: 10m
+    maxInstance: 2
+    maxUnavailable: 0
+  image: 172.17.120.107:5000/mysql:v8.0.26-06291516
+  imagePullPolicy: IfNotPresent
+  instances: 2
+  maintenanceMode: false
+  pause:
+    mode: ins
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+  port: 3306
+  pvReclaimPolicy: Retain
+  resources:
+    limits:
+      cpu: "2"
+      memory: 2Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+  restart:
+    mode: cluster
+    strategy: rolling
+  scaling:
+    scaleIn:
+      strategy: fault
+    scaleOut:
+      source: clone
+  service:
+    readPort: 30040
+    type: NodePort
+    writePort: 30041
+  upgradeStrategy: rollingUpgrade
+  version: 8.0.26
+  volumeClaimTemplates:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+  cloneSource:
+    namespace: default
+    clusterName: greatdb-sample

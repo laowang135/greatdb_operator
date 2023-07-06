@@ -104,7 +104,10 @@ func (great GreatDBBackupScheduleManager) syncGreatDBBackUpScheduler(backupSched
 					}
 				}
 				if !exist {
-					createBackupRecord(&cronMgr, backupSchedule, bcp)
+					err := createBackupRecord(&cronMgr, backupSchedule, bcp)
+					if err != nil {
+						return err
+					}
 				}
 
 				continue
