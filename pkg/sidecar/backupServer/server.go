@@ -160,8 +160,9 @@ func (s *server) backupInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	backupRepData := []byte{}
+
 	if backupReq.BackupResource == string(v1alpha1.GreatDBBackupResourceType) {
-		file := backupReq.GetBackupInfoFile()
+		file := backupReq.GetBackupInfoFile(s.cfg.Namespace)
 		if _, err := os.Stat(file); err != nil {
 			logger.Errorf("%v, failed to get backup info file", file)
 			http.Error(w, "get backup info failed", http.StatusBadRequest)

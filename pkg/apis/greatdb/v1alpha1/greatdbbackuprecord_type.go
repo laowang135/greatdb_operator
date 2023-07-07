@@ -41,7 +41,6 @@ type GreatDBBackupRecordSpec struct {
 	ClusterName string `json:"clusterName,omitempty"`
 
 	// Backup from a specified instance
-	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName,omitempty"`
 
 	// Backup type

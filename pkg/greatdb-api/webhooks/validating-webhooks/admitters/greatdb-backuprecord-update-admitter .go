@@ -46,7 +46,7 @@ func ValidatingGreatDBBackupRecordUpdateSpec(field *k8sfield.Path, record, oldRe
 func ValidatingInstanceNameUpdate(field *k8sfield.Path, insName, oldInsName string) []metav1.StatusCause {
 	var causes []metav1.StatusCause
 
-	if insName != oldInsName {
+	if oldInsName != "" && insName != oldInsName {
 		causes = append(causes, metav1.StatusCause{
 			Type:    metav1.CauseTypeFieldValueInvalid,
 			Message: "prohibit modification",

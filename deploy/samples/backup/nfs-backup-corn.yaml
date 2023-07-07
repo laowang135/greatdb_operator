@@ -1,0 +1,14 @@
+apiVersion: greatdb.com/v1alpha1
+kind: GreatDBBackupSchedule
+metadata:
+  name: nfs-backup-corn
+spec:
+  clusterName: greatdb-sample
+  schedulers:
+  - name: test1
+    backupType: full
+    backupResource: greatdb
+    schedule: ""
+    clean: "7d"
+    selectStorage:
+      type: nfs

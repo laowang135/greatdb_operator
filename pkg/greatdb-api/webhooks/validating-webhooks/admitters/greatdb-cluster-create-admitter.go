@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
+	"greatdb-operator/pkg/client/clientset/versioned"
 	"greatdb-operator/pkg/greatdb-api/webhooks/utils"
 	"greatdb-operator/pkg/resources"
 	"greatdb-operator/pkg/utils/log"
@@ -19,7 +20,8 @@ import (
 )
 
 type GreatDBClusterCreateAdmitter struct {
-	Client kubernetes.Interface
+	Client        kubernetes.Interface
+	GreatDBClient versioned.Interface
 }
 
 func (admit GreatDBClusterCreateAdmitter) Admit(ar *admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
@@ -27,19 +29,20 @@ func (admit GreatDBClusterCreateAdmitter) Admit(ar *admissionv1.AdmissionReview)
 	if err != nil {
 		return utils.ToAdmissionResponseError(err)
 	}
-	causes := ValidatingGreatDBClusterSpec(k8sfield.NewPath("spec"), newCluster.Namespace, &newCluster.Spec, admit.Client)
+	causes := ValidatingGreatDBClusterSpec(k8sfield.NewPath("spec"), newCluster.Namespace, &newCluster.Spec, admit.Client, admit.GreatDBClient)
 
 	return utils.NewAdmissionResponse(causes)
 
 }
 
-func ValidatingGreatDBClusterSpec(field *k8sfield.Path, ns string, spec *v1alpha1.GreatDBPaxosSpec, client kubernetes.Interface) []metav1.StatusCause {
+func ValidatingGreatDBClusterSpec(field *k8sfield.Path, ns string, spec *v1alpha1.GreatDBPaxosSpec, client kubernetes.Interface, greatDBClient versioned.Interface) []metav1.StatusCause {
 	var causes []metav1.StatusCause
 	causes = append(causes, ValidatingSecretName(field.Child("secretName"), ns, spec.SecretName, client)...)
 	causes = append(causes, ValidatingPriorityClassName(field.Child("priorityClassName"), spec.PriorityClassName, client)...)
 	causes = append(causes, ValidatingImagePullSecrets(field.Child("imagePullSecrets"), ns, spec.ImagePullSecrets, client)...)
 	causes = append(causes, ValidatingPort(field.Child("port"), ns, spec.Port)...)
 	causes = append(causes, ValidatingService(field.Child("service"), spec.Service, client)...)
+	causes = append(causes, ValidatingCloneSource(field.Child("cloneSource"), ns, spec.CloneSource, greatDBClient)...)
 	return causes
 
 }
@@ -197,6 +200,56 @@ func ValidatingService(field *k8sfield.Path, service v1alpha1.ServiceType, clien
 					Type:    metav1.CauseTypeFieldValueInvalid,
 					Message: fmt.Sprintf("Invalid value: %d: provided port is already allocated", service.WritePort),
 					Field:   field.Child("writePort").String(),
+				})
+			}
+		}
+	}
+
+	return causes
+}
+
+func ValidatingCloneSource(field *k8sfield.Path, ns string, cloneSource *v1alpha1.CloneSource, greatDBClient versioned.Interface) []metav1.StatusCause {
+	var causes []metav1.StatusCause
+	if cloneSource == nil {
+		return causes
+	}
+
+	if cloneSource.Namespace != "" {
+		ns = cloneSource.Namespace
+	}
+
+	if cloneSource.ClusterName != "" {
+		_, err := greatDBClient.GreatdbV1alpha1().GreatDBPaxoses(ns).Get(context.TODO(), cloneSource.ClusterName, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				causes = append(causes, metav1.StatusCause{
+					Type:    metav1.CauseTypeFieldValueNotFound,
+					Message: fmt.Sprintf("cluster %s/%s does not exist", ns, cloneSource.ClusterName),
+					Field:   field.Child("clusterName").String(),
+				})
+			} else {
+				causes = append(causes, metav1.StatusCause{
+					Type:  metav1.CauseTypeUnexpectedServerResponse,
+					Field: field.Child("clusterName").String(),
+				})
+			}
+		}
+
+	}
+
+	if cloneSource.BackupRecordName != "" {
+		_, err := greatDBClient.GreatdbV1alpha1().GreatDBBackupRecords(ns).Get(context.TODO(), cloneSource.BackupRecordName, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				causes = append(causes, metav1.StatusCause{
+					Type:    metav1.CauseTypeFieldValueNotFound,
+					Message: fmt.Sprintf("backup record %s/%s does not exist", ns, cloneSource.BackupRecordName),
+					Field:   field.Child("backupRecordName").String(),
+				})
+			} else {
+				causes = append(causes, metav1.StatusCause{
+					Type:  metav1.CauseTypeUnexpectedServerResponse,
+					Field: field.Child("backupRecordName").String(),
 				})
 			}
 		}

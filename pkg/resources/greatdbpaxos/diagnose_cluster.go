@@ -257,7 +257,7 @@ func (cs *ClusterStatus) initUser(cluster *v1alpha1.GreatDBPaxos) error {
 }
 
 func (cs *ClusterStatus) checkInstanceContainersIsReady() bool {
-	if cs.AllInstance == nil {
+	if cs.AllInstance == nil || len(cs.AllInstance) == 0 {
 		return false
 	}
 	for _, ins := range cs.AllInstance {
@@ -333,6 +333,13 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 
 		if cluster.Status.Member[i].Type == v1alpha1.MemberStatusFailure && !GreatdbInstanceStatusNormal(ins.State) {
 			continue
+		}
+
+		if ins.State == v1alpha1.MemberStatusOnline {
+			if cluster.Status.Member[i].CreateType == v1alpha1.InitCreateMember || cluster.Status.Member[i].CreateType == v1alpha1.FailOverCreateMember ||
+				cluster.Status.Member[i].CreateType == v1alpha1.ScaleCreateMember {
+				cluster.Status.Member[i].CreateType = v1alpha1.MemberCreateType(string(cluster.Status.Member[i].CreateType) + "_complete")
+			}
 		}
 
 		cluster.Status.LastProbeTime = now

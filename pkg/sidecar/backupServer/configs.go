@@ -293,8 +293,8 @@ type BackupInfoRequest struct {
 	Name           string `json:"name"`
 }
 
-func (req *BackupInfoRequest) GetBackupInfoFile() string {
-	return path.Join("/backup/", req.Name, "/xtrabackup_checkpoints")
+func (req *BackupInfoRequest) GetBackupInfoFile(ns string) string {
+	return path.Join("/backup/", ns, req.Name, "/xtrabackup_checkpoints")
 }
 
 type BackupInfoResponse struct {

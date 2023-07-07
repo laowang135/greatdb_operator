@@ -87,7 +87,7 @@ func cleanBackupRecord(r *deps.CronRegistry, backupSch *v1alpha1.GreatDBBackupSc
 
 }
 
-func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBackupSchedule, scheduler v1alpha1.BackupScheduler) {
+func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBackupSchedule, scheduler v1alpha1.BackupScheduler) error {
 
 	now := resources.GetNowTime().Format("20060102150405")
 	recordName := fmt.Sprintf("%s-%s-%s-%s", scheduler.BackupResource, scheduler.BackupType, greatdbbackup.Name, now)
@@ -96,10 +96,10 @@ func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBac
 		if k8serrors.IsNotFound(err) {
 			name := getBackupScheduleName(greatdbbackup, scheduler)
 			deleteBackupSchedule(r, name)
-			return
+			return nil
 		}
 		dblog.Log.Reason(err).Errorf("failed to get GreatDBBackupSchedules %s/%s ", greatdbbackup.Namespace, greatdbbackup.Name)
-		return
+		return err
 
 	}
 
@@ -126,13 +126,14 @@ func createBackupRecord(r *deps.CronRegistry, greatdbbackup *v1alpha1.GreatDBBac
 	_, err = r.Client.Clientset.GreatdbV1alpha1().GreatDBBackupRecords(greatdbbackup.Namespace).Create(context.TODO(), backupRcord, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			return
+			return nil
 		}
 		dblog.Log.Reason(err).Errorf("failed to create backup")
-		return
+		return err
 	}
 	dblog.Log.Infof("success to create backup record: %s/%s", greatdbbackup.Namespace, recordName)
 
+	return nil
 }
 
 func deleteBackupSchedule(r *deps.CronRegistry, name string) {

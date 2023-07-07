@@ -118,9 +118,9 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 		cluster.Spec.Scaling.ScaleOut.Source = v1alpha1.ScaleOutSourceBackup
 	}
 
-	if cluster.Spec.Instances < 3 {
+	if cluster.Spec.Instances < 2 {
 		update = true
-		cluster.Spec.Instances = 3
+		cluster.Spec.Instances = 2
 	}
 
 	if cluster.Spec.Port == 0 {

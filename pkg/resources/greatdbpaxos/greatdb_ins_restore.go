@@ -122,13 +122,8 @@ func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.Gr
 			Value: string(backuprecord.Spec.SelectStorage.Type),
 		},
 		{
-			Name: "NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  "metadata.namespace",
-				},
-			},
+			Name:  "NAMESPACE",
+			Value: backuprecord.Namespace,
 		},
 	}
 
