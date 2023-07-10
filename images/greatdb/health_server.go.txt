@@ -1,0 +1,65 @@
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"net/http"
+	"os"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+var (
+	hostname string
+	user     string
+	password string
+	port     string
+)
+
+func init() {
+	hostname = os.Getenv("HOSTNAME")
+	user = os.Getenv("ClusterUser")
+	if user == "" {
+		user = "greatdb"
+	}
+	password := os.Getenv("ClusterUserPassword")
+	if password == "" {
+		password = "greatdb"
+	}
+
+	port := os.Getenv("SERVERPORT")
+	if port == "" {
+		port = "3306"
+	}
+}
+
+func requestMysql(w http.ResponseWriter, r *http.Request) {
+
+	host := fmt.Sprintf("%s:%s@tcp(%s:%s)/mysql?timeout=3s&charset=utf8mb4", user, password, hostname, port)
+
+	db, err := sql.Open("mysql", host)
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	defer db.Close()
+
+	if err = db.Ping(); err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+	}
+	w.WriteHeader(200)
+	w.Write([]byte(""))
+
+}
+
+func main() {
+
+	http.HandleFunc("/health", requestMysql)
+	if err := http.ListenAndServe(":8001", nil); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+}

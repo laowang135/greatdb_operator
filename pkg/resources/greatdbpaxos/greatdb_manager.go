@@ -449,12 +449,15 @@ func (great GreatDBManager) newGreatDBContainers(serviceName string, cluster *v1
 			},
 		},
 		LivenessProbe: &corev1.Probe{
-			InitialDelaySeconds: 60,
 			PeriodSeconds:       10,
-			FailureThreshold:    6,
-			TimeoutSeconds:      5,
+			InitialDelaySeconds: 30,
+			FailureThreshold:    3,
+			TimeoutSeconds:      3,
 			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{Command: []string{"ReadinessProbe"}},
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/health",
+					Port: intstr.FromInt(8001),
+				},
 			},
 		},
 	}
@@ -875,6 +878,9 @@ func (great GreatDBManager) UpdateGreatDBStatus(cluster *v1alpha1.GreatDBPaxos) 
 	case v1alpha1.GreatDBPaxosRepair:
 		if cluster.Status.ReadyInstances < cluster.Spec.Instances {
 			diag.repairCluster(cluster)
+		}
+		if cluster.Status.ReadyInstances == cluster.Spec.Instances {
+			UpdateClusterStatusCondition(cluster, v1alpha1.GreatDBPaxosReady, "")
 		}
 
 		return nil
