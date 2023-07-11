@@ -935,7 +935,7 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 		} else if instanceStatus.State == v1alpha1.MemberStatusOnline || instanceStatus.State == v1alpha1.MemberStatusRecovering {
 			onlinePods = append(onlinePods, member)
 			onlineMemberStatuses[member.Address] = instanceStatus
-		} else {
+		} else if instanceStatus.State == v1alpha1.MemberStatusUnknown {
 			unsurePods = append(unsurePods, member)
 		}
 	}

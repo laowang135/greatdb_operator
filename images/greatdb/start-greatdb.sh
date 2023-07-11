@@ -234,6 +234,12 @@ start_mysql() {
     $mysql_server --defaults-file=/greatdb/mysql/conf/my.cnf &
 }
 
+
+start_health(){
+    health_server &
+}
+
+
 _main() {
     pre_check
     init_database_dir
@@ -245,6 +251,11 @@ _main() {
     start_mysql
     if [ "$?" != "0" ]; then
         echo "Failed to start the database"
+        exit 1
+    fi
+    start_health
+     if [ "$?" != "0" ]; then
+        echo "Failed to start the health server"
         exit 1
     fi
 

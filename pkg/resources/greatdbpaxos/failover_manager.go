@@ -136,14 +136,14 @@ func (great GreatDBManager) stateTransition(cluster *v1alpha1.GreatDBPaxos) (fai
 		if mem.Type == v1alpha1.MemberStatusError || mem.Type == v1alpha1.MemberStatusOffline ||
 			mem.Type == v1alpha1.MemberStatusUnmanaged || mem.Type == v1alpha1.MemberStatusUnknown || (mem.Type == v1alpha1.MemberStatusPending && mem.JoinCluster) {
 			if now.Sub(mem.LastTransitionTime.Time) > period {
-				mem.LastTransitionTime = now
-				mem.LastUpdateTime = now
-				mem.Message = fmt.Sprintf("The instance is in state %s for more than the failover period %s", mem.Type, cluster.Spec.FailOver.Period)
-				mem.Type = v1alpha1.MemberStatusFailure
-				cluster.Status.Member[index] = mem
 
+				cluster.Status.Member[index].LastUpdateTime = now
+				cluster.Status.Member[index].LastTransitionTime = now
+				cluster.Status.Member[index].Type = v1alpha1.MemberStatusFailure
+				cluster.Status.Member[index].Message = fmt.Sprintf("The instance is in state %s for more than the failover period %s", mem.Type, cluster.Spec.FailOver.Period)
+				failedIns++
 			}
-			failedIns++
+
 		}
 
 	}
