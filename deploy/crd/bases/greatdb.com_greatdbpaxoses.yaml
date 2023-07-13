@@ -992,11 +992,6 @@ spec:
                     default: true
                     description: 'Enable failover function, default: true'
                     type: boolean
-                  failoverPeriod:
-                    default: 10m
-                    description: The period of failover after the greatdb instance
-                      fails
-                    type: string
                   maxInstance:
                     default: 3
                     description: Maximum number of recoverable instances
@@ -1012,6 +1007,11 @@ spec:
                       prevent all voluntary evictions by specifying 0. This is a mutually
                       exclusive setting with "minAvailable".
                     x-kubernetes-int-or-string: true
+                  period:
+                    default: 10m
+                    description: The period of failover after the greatdb instance
+                      fails
+                    type: string
                 type: object
               image:
                 description: image used by the GreatDBPaxos

@@ -9,6 +9,7 @@ spec:
     backupType: full
     backupResource: greatdb
     clean: "7d"
+    schedule: ""
     selectStorage:
       type: s3
       s3:
