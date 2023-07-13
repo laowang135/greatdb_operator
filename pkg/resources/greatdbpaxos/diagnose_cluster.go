@@ -930,7 +930,8 @@ func DiagnoseCluster(cluster *v1alpha1.GreatDBPaxos, lister *deps.Listers) Clust
 			onlineMemberAddress = append(onlineMemberAddress, member.Address)
 		}
 
-		if instanceStatus.State == v1alpha1.MemberStatusOffline || instanceStatus.State == v1alpha1.MemberStatusError || instanceStatus.State == v1alpha1.MemberStatusUnmanaged {
+		if instanceStatus.State == v1alpha1.MemberStatusOffline || instanceStatus.State == v1alpha1.MemberStatusError || instanceStatus.State == v1alpha1.MemberStatusUnmanaged ||
+			instanceStatus.State == v1alpha1.MemberStatusFree {
 			offlinePods = append(offlinePods, member)
 		} else if instanceStatus.State == v1alpha1.MemberStatusOnline || instanceStatus.State == v1alpha1.MemberStatusRecovering {
 			onlinePods = append(onlinePods, member)

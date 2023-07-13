@@ -8,7 +8,7 @@ spec:
   - name: test1
     backupType: full
     backupResource: greatdb
-    schedule: ""
     clean: "7d"
+    schedule: "0 0 0 * * ?"
     selectStorage:
       type: nfs

@@ -112,7 +112,7 @@ type BackupStorageSpec struct {
 
 	// Upload to file server
 	// +optional
-	UploadServer *BackupStorageUploadServerSpec `json:"UploadServer,omitempty"`
+	// UploadServer *BackupStorageUploadServerSpec `json:"UploadServer,omitempty"`
 }
 
 type BackupStorageS3Spec struct {

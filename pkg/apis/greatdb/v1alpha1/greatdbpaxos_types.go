@@ -147,13 +147,14 @@ type FailOver struct {
 	// The period of failover after the greatdb instance fails
 	// +kubebuilder:default="10m"
 	// +optional
-	Period string `json:"failoverPeriod,omitempty"`
+	Period string `json:"period,omitempty"`
+
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
 	// the evicted pod. For example, one can prevent all voluntary evictions
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
 	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,3,opt,name=maxUnavailable"`
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// Whether to automatically shrink the expansion node after the recovery of the faulty node, default： false
 	// +kubebuilder:default=false
