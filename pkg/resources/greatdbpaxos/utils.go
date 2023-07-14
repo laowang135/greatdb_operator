@@ -233,13 +233,10 @@ func GetNormalMemberSqlClient(cluster *v1alpha1.GreatDBPaxos) (internal.DBClient
 		if member.Type != v1alpha1.MemberStatusFree && member.Type != v1alpha1.MemberStatusOnline {
 			continue
 		}
-		// TODO Debug
-		// host := member.Address
-		// if host == "" {
-		// 	host = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
-		// }
-
-		host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+		host := member.Address
+		if host == "" {
+			host = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+		}
 
 		err := client.Connect(user, pwd, host, port, "mysql")
 

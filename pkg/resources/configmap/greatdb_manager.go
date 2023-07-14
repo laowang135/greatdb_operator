@@ -485,10 +485,10 @@ func (greatdb greatdbConfigManager) getGreatdbServiceClientUri(cluster *v1alpha1
 			uris = append(uris, member.Address)
 			continue
 		}
-		svcName := cluster.Name + resources.ComponentGreatDBSuffix
-		host := fmt.Sprintf("%s.%s.%s.svc.%s", member.Name, svcName, cluster.Namespace, cluster.Spec.ClusterDomain)
+		// svcName := cluster.Name + resources.ComponentGreatDBSuffix
+		// host := fmt.Sprintf("%s.%s.%s.svc.%s", member.Name, svcName, cluster.Namespace, cluster.Spec.ClusterDomain)
 		// TODO Debug
-		// host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+		host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
 		uris = append(uris, host)
 	}
 

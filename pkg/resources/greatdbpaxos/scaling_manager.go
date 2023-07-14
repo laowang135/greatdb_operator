@@ -78,23 +78,7 @@ func (great GreatDBManager) ScaleOut(cluster *v1alpha1.GreatDBPaxos) error {
 		}
 		groupSeed = strings.TrimSuffix(groupSeed, ",")
 
-		// return great.SetVariableGroupSeeds(cluster,hosts,groupSeed)
-
-		// TODO DEBUG
-		hostList := make([]string, 0)
-		for _, member := range cluster.Status.Member {
-			if member.Name == name {
-				continue
-			}
-
-			if member.Type == v1alpha1.MemberStatusPause || member.Type == v1alpha1.MemberStatusRestart {
-				continue
-			}
-
-			host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.GetClusterDomain())
-			hostList = append(hostList, host)
-		}
-		return great.SetVariableGroupSeeds(cluster, hostList, groupSeed)
+		return great.SetVariableGroupSeeds(cluster, hosts, groupSeed)
 
 	} else {
 		member := great.GetMinOrMaxIndexMember(cluster, true)
@@ -152,20 +136,7 @@ func (great GreatDBManager) ScaleIn(cluster *v1alpha1.GreatDBPaxos) error {
 		}
 		groupSeed = strings.TrimSuffix(groupSeed, ",")
 
-		// return great.SetVariableGroupSeeds(cluster, hosts,groupSeed)
-
-		// TODO DEBUG
-		hostList := make([]string, 0)
-		for _, member := range cluster.Status.Member {
-
-			if member.Type == v1alpha1.MemberStatusPause || member.Type == v1alpha1.MemberStatusRestart {
-				continue
-			}
-
-			host := resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.GetClusterDomain())
-			hostList = append(hostList, host)
-		}
-		return great.SetVariableGroupSeeds(cluster, hostList, groupSeed)
+		return great.SetVariableGroupSeeds(cluster, hosts, groupSeed)
 
 	} else {
 		if cluster.Status.Phase == v1alpha1.GreatDBPaxosScaleIn {
