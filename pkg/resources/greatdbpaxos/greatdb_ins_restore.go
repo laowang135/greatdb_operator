@@ -152,19 +152,19 @@ func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.Gr
 
 	}
 
-	if backuprecord.Spec.SelectStorage.Type == v1alpha1.BackupStorageUploadServer && backuprecord.Spec.SelectStorage.UploadServer != nil {
-		uploadServerEnv := []corev1.EnvVar{
-			{
-				Name:  "UploadServerAddress",
-				Value: backuprecord.Spec.SelectStorage.UploadServer.Address,
-			},
-			{
-				Name:  "UploadServerPort",
-				Value: strconv.Itoa(resources.BackupServerPort),
-			},
-		}
-		env = append(env, uploadServerEnv...)
-	}
+	// if backuprecord.Spec.SelectStorage.Type == v1alpha1.BackupStorageUploadServer && backuprecord.Spec.SelectStorage.UploadServer != nil {
+	// 	uploadServerEnv := []corev1.EnvVar{
+	// 		{
+	// 			Name:  "UploadServerAddress",
+	// 			Value: backuprecord.Spec.SelectStorage.UploadServer.Address,
+	// 		},
+	// 		{
+	// 			Name:  "UploadServerPort",
+	// 			Value: strconv.Itoa(resources.BackupServerPort),
+	// 		},
+	// 	}
+	// 	env = append(env, uploadServerEnv...)
+	// }
 
 	return
 }

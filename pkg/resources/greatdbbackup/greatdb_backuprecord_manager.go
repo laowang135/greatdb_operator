@@ -348,19 +348,19 @@ func (great GreatDBBackupRecordManager) newGreatDBBackupRecordEnv(backuprecord *
 		env = append(env, s3Env...)
 	}
 
-	if backuprecord.Spec.SelectStorage.Type == v1alpha1.BackupStorageUploadServer {
-		uploadServerEnv := []corev1.EnvVar{
-			{
-				Name:  "UploadServerAddress",
-				Value: backuprecord.Spec.SelectStorage.UploadServer.Address,
-			},
-			{
-				Name:  "UploadServerPort",
-				Value: strconv.Itoa(backuprecord.Spec.SelectStorage.UploadServer.Port),
-			},
-		}
-		env = append(env, uploadServerEnv...)
-	}
+	// if backuprecord.Spec.SelectStorage.Type == v1alpha1.BackupStorageUploadServer {
+	// 	uploadServerEnv := []corev1.EnvVar{
+	// 		{
+	// 			Name:  "UploadServerAddress",
+	// 			Value: backuprecord.Spec.SelectStorage.UploadServer.Address,
+	// 		},
+	// 		{
+	// 			Name:  "UploadServerPort",
+	// 			Value: strconv.Itoa(backuprecord.Spec.SelectStorage.UploadServer.Port),
+	// 		},
+	// 	}
+	// 	env = append(env, uploadServerEnv...)
+	// }
 
 	if backuprecord.Spec.BackupType == v1alpha1.BackupTypeIncrement {
 

@@ -113,7 +113,6 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 		}
 	}
 
-	// TODO DEBUG
 	if cluster.Spec.Scaling.ScaleOut.Source == "" {
 		cluster.Spec.Scaling.ScaleOut.Source = v1alpha1.ScaleOutSourceBackup
 	}

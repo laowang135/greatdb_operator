@@ -78,14 +78,6 @@ spec:
               selectStorage:
                 description: select storage spec
                 properties:
-                  UploadServer:
-                    description: Upload to file server
-                    properties:
-                      address:
-                        type: string
-                      port:
-                        type: integer
-                    type: object
                   s3:
                     description: S3 storage
                     properties:
