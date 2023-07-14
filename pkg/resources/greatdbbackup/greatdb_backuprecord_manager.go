@@ -286,10 +286,8 @@ func (great GreatDBBackupRecordManager) newGreatDBBackupContainers(backuprecord 
 }
 
 func (great GreatDBBackupRecordManager) newGreatDBBackupRecordEnv(backuprecord *v1alpha1.GreatDBBackupRecord, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
-	svcName := cluster.Name + resources.ComponentGreatDBSuffix
-	backupServerAddress := fmt.Sprintf("%s.%s.%s.svc.%s", backuprecord.Spec.InstanceName, svcName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
-	// TODO DEBUG
-	// backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
+
+	backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
 	env = []corev1.EnvVar{
 		{
 			Name: "NAMESPACE",
@@ -482,11 +480,10 @@ func (great GreatDBBackupRecordManager) getBackupInfo(backuprecord *v1alpha1.Gre
 		return fmt.Errorf("backup failed")
 	}
 
-	// TODO DEBUG
-	// backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, clusterDomain)
-	// server := fmt.Sprintf("http://%s:%d%s", backupServerAddress, backupServer.ServerPort, backupServer.ServerBackupInfoEndpoint)
+	backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, clusterDomain)
+	server := fmt.Sprintf("http://%s:%d%s", backupServerAddress, backupServer.ServerPort, backupServer.ServerBackupInfoEndpoint)
 
-	server := fmt.Sprintf("http://%s:%d%s", "172.17.120.142", 30031, backupServer.ServerBackupInfoEndpoint)
+	// server := fmt.Sprintf("http://%s:%d%s", "172.17.120.142", 30031, backupServer.ServerBackupInfoEndpoint)
 
 	resp, err := http.Post(server,
 		"application/json",

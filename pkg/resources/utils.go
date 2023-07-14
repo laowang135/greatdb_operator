@@ -4,8 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -105,19 +103,19 @@ func GetClusterUser(cluster *v1alpha1.GreatDBPaxos) (string, string) {
 
 func GetInstanceFQDN(clusterName, insName, ns, clusterDomain string) string {
 	// TODO Debug
-	if clusterName == "greatdb-sample" {
-		d := strings.Split(insName, "-")
-		no, err := strconv.Atoi(d[len(d)-1])
-		if err == nil {
-			return fmt.Sprintf("172.17.120.142:%d", 30010+no)
-		}
-	} else if clusterName == "greatdb-test" {
-		d := strings.Split(insName, "-")
-		no, err := strconv.Atoi(d[len(d)-1])
-		if err == nil {
-			return fmt.Sprintf("172.17.120.142:%d", 30050+no)
-		}
-	}
+	// if clusterName == "greatdb-sample" {
+	// 	d := strings.Split(insName, "-")
+	// 	no, err := strconv.Atoi(d[len(d)-1])
+	// 	if err == nil {
+	// 		return fmt.Sprintf("172.17.120.142:%d", 30010+no)
+	// 	}
+	// } else if clusterName == "greatdb-test" {
+	// 	d := strings.Split(insName, "-")
+	// 	no, err := strconv.Atoi(d[len(d)-1])
+	// 	if err == nil {
+	// 		return fmt.Sprintf("172.17.120.142:%d", 30050+no)
+	// 	}
+	// }
 
 	svcName := clusterName + ComponentGreatDBSuffix
 

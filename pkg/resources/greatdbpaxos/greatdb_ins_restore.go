@@ -96,11 +96,8 @@ func (great GreatDBManager) newGreatDBCloneContainers(donorIns string, cluster *
 
 func (great GreatDBManager) newGreatDBBackupRestoreEnv(backuprecord *v1alpha1.GreatDBBackupRecord, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
 
-	// TODO DEBUG
-	// backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
+	backupServerAddress := resources.GetInstanceFQDN(backuprecord.Spec.ClusterName, backuprecord.Spec.InstanceName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
 
-	svcName := cluster.Name + resources.ComponentGreatDBSuffix
-	backupServerAddress := fmt.Sprintf("%s.%s.%s.svc.%s", backuprecord.Spec.InstanceName, svcName, backuprecord.Namespace, cluster.Spec.ClusterDomain)
 	env = []corev1.EnvVar{
 		{
 			Name:  "BackupServerAddress",

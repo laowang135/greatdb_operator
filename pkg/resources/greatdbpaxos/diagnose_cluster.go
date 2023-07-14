@@ -304,11 +304,8 @@ func (cs *ClusterStatus) publishInstanceStatus(cluster *v1alpha1.GreatDBPaxos) {
 					if member.Address != "" {
 						break
 					}
-					svcName := cluster.Name + resources.ComponentGreatDBSuffix
 
-					cluster.Status.Member[i].Address = fmt.Sprintf("%s.%s.%s.svc.%s", member.Name, svcName, cluster.Namespace, cluster.Spec.ClusterDomain)
-					// TODO Debug
-					// cluster.Status.Member[i].Address = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
+					cluster.Status.Member[i].Address = resources.GetInstanceFQDN(cluster.Name, member.Name, cluster.Namespace, cluster.Spec.ClusterDomain)
 					break
 				}
 			}
