@@ -58,6 +58,10 @@ rules:
   resources:
   - greatdbpaxoses
   - greatdbpaxoses/status
+  - greatdbbackuprecords
+  - greatdbbackuprecords/status
+  - greatdbbackupschedules
+  - greatdbbackupschedules/status
   verbs:
   - get
   - list

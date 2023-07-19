@@ -20,10 +20,10 @@ spec:
   failOver:
     autoScaleiIn: false
     enable: true
-    failoverPeriod: 10m
+    period: 10m
     maxInstance: 3
     maxUnavailable: 0
-  image: 172.17.120.107:5000/mysql:v8.0.26-06291516
+  image: 172.17.120.107:5000/mysql:v8.0.26-07101240
   imagePullPolicy: IfNotPresent
   instances: 3
   maintenanceMode: false
@@ -60,4 +60,4 @@ spec:
     - ReadWriteOnce
     resources:
       requests:
-        storage: 10Gi
+        storage: 50Gi
