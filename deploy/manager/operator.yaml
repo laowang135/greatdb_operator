@@ -16,11 +16,11 @@ spec:
     spec:
       serviceAccountName: greatdbpaxos-operator
       nodeSelector:
-        kubernetes.io/hostname: k8s-master
+        kubernetes.io/hostname: k8s-node-142
       containers:
         - name: operator
           # Replace this with the built image name
-          image: 172.17.120.107:5000/greatdbpaxos-operator:v0.1-06051559          
+          image: 172.17.120.107:5000/greatdb-operator:v1.0-07181308
           command:
           - /greatdb-operator 
           imagePullPolicy: IfNotPresent
