@@ -175,6 +175,47 @@ type CloneSource struct {
 	BackupRecordName string `json:"backupRecordName,omitempty"`
 }
 
+
+type GreatDBDashboard struct {
+	// Eabled Dashboard components
+	// +optional
+	Enable bool `json:"enable"`
+
+	// image used by the component
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// Compute Resources required by this container. Cannot be updated
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// +optional
+	PersistentVolumeClaimSpec v1.PersistentVolumeClaimSpec `json:"persistentVolumeClaimSpec,omitempty"`
+
+	Config map[string]string `json:"config,omitempty"`
+
+	// Annotations for the component.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// Labels for the component.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+
+// LogCollection is the desired state of Promtail sidecar
+type LogCollection struct {
+	// image used by the component
+	Image string `json:"image"`
+
+	LokiClient string `json:"lokiClient,omitempty"`
+	// Compute Resources required by this container. Cannot be updated
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
 // GreatDBPaxosSpec defines the desired state of GreatDBPaxos
 type GreatDBPaxosSpec struct {
 	// set cluster affinity
@@ -302,6 +343,14 @@ type GreatDBPaxosSpec struct {
 	// Configure the clone source and create a new cluster based on existing data
 	// +optional
 	CloneSource *CloneSource `json:"cloneSource,omitempty"`
+
+	// GreatDBDashboar Is the configuration of this Dashboard component
+	// +optional
+	Dashboard GreatDBDashboard `json:"dashboard,omitempty"`
+
+	// LogCollection Is the configuration of this promtail component
+	// +optional
+	LogCollection LogCollection `json:"logCollection,omitempty"`
 }
 
 // GreatDBPaxosConditions  service state of GreatDBPaxos.
@@ -399,6 +448,20 @@ type RestartMember struct {
 	Restarted map[string]string `json:"restarted,omitempty"`
 }
 
+type DashboardStatus struct {
+	// Indicates whether the cluster is ready
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastSyncTime metav1.Time `json:"lastSyncTime,omitempty"`
+
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
 // GreatDBPaxosStatus defines the observed state of GreatDBPaxos
 type GreatDBPaxosStatus struct {
 
@@ -470,6 +533,8 @@ type GreatDBPaxosStatus struct {
 	Users []User `json:"users,omitempty"`
 
 	CloneSource CloneSource `json:"cloneSource,omitempty"`
+
+	Dashboard DashboardStatus `json:"dashboard,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

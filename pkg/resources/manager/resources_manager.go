@@ -37,12 +37,14 @@ type GreatDBPaxosResourceManagers struct {
 	Service   manager
 	Secret    manager
 	GreatDB   manager
+	Dashboard manager
 }
 
 func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Listers, recorder record.EventRecorder) *GreatDBPaxosResourceManagers {
 	configmap := &configmap.ConfigMapManager{Client: client, Listers: listers, Recorder: recorder}
 	service := &service.ServiceManager{Client: client, Listers: listers, Recorder: recorder}
 	secret := &secret.SecretManager{Client: client, Lister: listers, Recorder: recorder}
+	dashboard := &greatdbpaxos.DashboardManager{Client: client,Lister: listers}
 
 	gdb := &greatdbpaxos.GreatDBManager{Client: client, Lister: listers, Recorder: recorder}
 	return &GreatDBPaxosResourceManagers{
@@ -50,6 +52,7 @@ func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Liste
 		Service:   service,
 		Secret:    secret,
 		GreatDB:   gdb,
+		Dashboard: dashboard,
 	}
 
 }

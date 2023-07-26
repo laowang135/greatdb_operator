@@ -4,6 +4,8 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,6 +104,7 @@ func GetClusterUser(cluster *v1alpha1.GreatDBPaxos) (string, string) {
 }
 
 func GetInstanceFQDN(clusterName, insName, ns, clusterDomain string) string {
+	
 	// TODO Debug
 	// if clusterName == "greatdb-sample" {
 	// 	d := strings.Split(insName, "-")

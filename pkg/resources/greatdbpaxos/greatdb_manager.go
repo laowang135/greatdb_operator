@@ -255,6 +255,8 @@ func (great GreatDBManager) GetLabels(clusterName string) (labels map[string]str
 	labels[resources.AppKubeNameLabelKey] = resources.AppKubeNameLabelValue
 	labels[resources.AppkubeManagedByLabelKey] = resources.AppkubeManagedByLabelValue
 	labels[resources.AppKubeInstanceLabelKey] = clusterName
+	labels[resources.AppKubeComponentLabelKey] = resources.AppKubeComponentGreatDB
+
 	return
 
 }
@@ -404,6 +406,12 @@ func (great GreatDBManager) newContainers(serviceName string, cluster *v1alpha1.
 	if *cluster.Spec.Backup.Enable {
 		backup := great.newGreatDBAgentContainers(serviceName, cluster)
 		containers = append(containers, backup)
+	}
+
+	//  Add exporter sidecar container
+	if cluster.Spec.LogCollection.Image != "" {
+		promtail := great.newPromtailContainers(serviceName, cluster)
+		containers = append(containers, promtail)
 	}
 
 	// Add another container
@@ -678,6 +686,68 @@ func (great GreatDBManager) newGreatAgentDBEnv(serviceName string, cluster *v1al
 
 	return
 }
+
+
+func (great GreatDBManager) newPromtailContainers(serviceName string, cluster *v1alpha1.GreatDBPaxos) (container corev1.Container) {
+	imagePullPolicy := corev1.PullIfNotPresent
+	if cluster.Spec.ImagePullPolicy != "" {
+		imagePullPolicy = cluster.Spec.ImagePullPolicy
+	}
+	lokiClient := cluster.Spec.LogCollection.LokiClient
+	if lokiClient == "" {
+		clusterDomain := cluster.GetClusterDomain()
+		dashboardName := cluster.Name + resources.ComponentDashboardSuffix
+		svcName := dashboardName
+		ns := cluster.Namespace
+		dashboardUriStr := "http://%s.%s.%s.svc.%s:8080/log-monitor/loki/api/v1/push"
+		lokiClient = fmt.Sprintf(dashboardUriStr, dashboardName, svcName, ns, clusterDomain)
+	}
+	env := great.newGreatDBEnv(serviceName, cluster)
+	envForm := great.newGreatDBEnvForm(cluster.Spec.SecretName)
+	promtailEnv := []corev1.EnvVar{
+		{
+			Name:  "INSTANCE_INTERIOR_PORT",
+			Value: fmt.Sprintf("%d", cluster.Spec.Port),
+		},
+		{
+			Name:  "LOKI_CLIENT",
+			Value: lokiClient,
+		},
+	}
+	env = append(env, promtailEnv...)
+	container = corev1.Container{
+		Name:            "promtail",
+		Image:           cluster.Spec.LogCollection.Image,
+		ImagePullPolicy: imagePullPolicy,
+		Resources:       cluster.Spec.LogCollection.Resources,
+		Command:         []string{"/usr/bin/promtail", "-config.expand-env=true", "-config.file=/etc/promtail/promtail.yaml"},
+		Env:             env,
+		EnvFrom: envForm,
+		VolumeMounts: []corev1.VolumeMount{
+			{ // data
+				Name:      resources.GreatdbPvcDataName,
+				MountPath: greatdbDataMountPath,
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			PeriodSeconds:       10,
+			InitialDelaySeconds: 10,
+			FailureThreshold:    3,
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3001)},
+			},
+		},
+		LivenessProbe: &corev1.Probe{
+			InitialDelaySeconds: 10,
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(3001)},
+			},
+		},
+	}
+
+	return
+}
+
 
 // updateGreatDBStatefulSet  Update greatdb statefulset
 func (great GreatDBManager) updateGreatDBPod(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {

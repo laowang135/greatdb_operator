@@ -296,6 +296,10 @@ func (ctrl *GreatDBClusterController) syncCluster(cluster *gcv1alpha1.GreatDBPax
 		return err
 	}
 
+	if err = ctrl.managers.Dashboard.Sync(cluster); err != nil {
+		return err
+	}
+
 	if err = ctrl.startForegroundDeletion(cluster); err != nil {
 		return err
 	}
