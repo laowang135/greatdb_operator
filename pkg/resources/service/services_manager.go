@@ -48,6 +48,12 @@ func (svc *ServiceManager) Sync(cluster *v1alpha1.GreatDBPaxos) error {
 		return err
 	}
 
+	// Synchronize greatdb cluster external communication services
+	if err := svc.SyncDashboardService(cluster); err != nil {
+		dblog.Log.Errorf("failed to synchronize dashboard service, message: %s", err.Error())
+		return err
+	}
+
 	return nil
 }
 
@@ -193,6 +199,7 @@ func (svc ServiceManager) getGreatDBServiceLabels(cluster *v1alpha1.GreatDBPaxos
 	labels[resources.AppKubeNameLabelKey] = resources.AppKubeNameLabelValue
 	labels[resources.AppKubeInstanceLabelKey] = cluster.Name
 	labels[resources.AppkubeManagedByLabelKey] = resources.AppkubeManagedByLabelValue
+	labels[resources.AppKubeComponentLabelKey] = resources.AppKubeComponentGreatDB
 
 	switch svcType {
 	case GreatDBServiceRead:
@@ -564,4 +571,151 @@ func getPortIndex(service *corev1.Service, port corev1.ServicePort) (int, bool) 
 
 	}
 	return -1, false
+}
+
+
+
+
+// SyncDashboardService Synchronize the services of dashboard
+func (svc *ServiceManager) SyncDashboardService(cluster *v1alpha1.GreatDBPaxos) error {
+
+	ns, clusterName := cluster.Namespace, cluster.Name
+	serviceName := cluster.GetName() + resources.ComponentDashboardSuffix
+
+	service, err := svc.Listers.ServiceLister.Services(ns).Get(serviceName)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			// The cluster starts to clean, and no more resources need to be created
+			if !cluster.DeletionTimestamp.IsZero() {
+				return nil
+			}
+			if err := svc.createDashboardService(ns, clusterName, serviceName, cluster.UID); err != nil {
+				return err
+			}
+			return nil
+		}
+		dblog.Log.Errorf("Failed to get service resource %s/%s from cache ,message: %s", ns, serviceName, err.Error())
+		return err
+	}
+
+	newservice := service.DeepCopy()
+	if err = svc.updateDashboardService(newservice, cluster); err != nil {
+		return err
+	}
+	return nil
+}
+
+
+
+func (svc ServiceManager) createDashboardService(ns, clusterName, serviceName string, clusterUID types.UID) error {
+
+	labels := svc.getServiceLabels(clusterName,resources.AppKubeComponentDashboard)
+	owner := resources.GetGreatDBClusterOwnerReferences(clusterName, clusterUID)
+	service := svc.NewDashboardService(serviceName, ns, labels, owner)
+
+	_, err := svc.Client.KubeClientset.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
+
+	if err != nil {
+		// If the service already exists, try to update it
+		if k8serrors.IsAlreadyExists(err) {
+			labels, _ := json.Marshal(service.ObjectMeta.Labels)
+			data := fmt.Sprintf(`{"metadata":{"labels":%s}}`, labels)
+			if err = svc.PatchService(ns, serviceName, data); err != nil {
+				return err
+			}
+			return nil
+		}
+		dblog.Log.Errorf("failed to create service %s, message: %s", serviceName, err.Error())
+		return err
+	}
+
+	return nil
+}
+
+// NewDashboardService Returns a service instance of Dashboard
+func (svc ServiceManager) NewDashboardService(servicename, namespace string, labels map[string]string, owner metav1.OwnerReference) (service *corev1.Service) {
+	service = &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            servicename,
+			Namespace:       namespace,
+			Labels:          labels,
+			Finalizers:      []string{resources.FinalizersGreatDBCluster},
+			OwnerReferences: []metav1.OwnerReference{owner},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: labels,
+			Type:     corev1.ServiceTypeClusterIP,
+			Ports: []corev1.ServicePort{
+				{Name: "client", Port: 8080, Protocol: corev1.ProtocolTCP, TargetPort: intstr.IntOrString{IntVal: 8080}},
+			},
+		},
+	}
+	return
+}
+
+// updateDashboardService If the service is modified manually, restore the service to the normal state
+func (svc ServiceManager) updateDashboardService(service *corev1.Service, cluster *v1alpha1.GreatDBPaxos) error {
+	if !cluster.DeletionTimestamp.IsZero() {
+		if len(service.Finalizers) == 0 {
+			return nil
+		}
+		patch := `[{"op":"remove","path":"/metadata/finalizers"}]`
+
+		_, err := svc.Client.KubeClientset.CoreV1().Services(service.Namespace).Patch(
+			context.TODO(), service.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+		if err != nil {
+			dblog.Log.Errorf("failed to delete finalizers of secret %s/%s,message: %s", service.Namespace, service.Name, err.Error())
+		}
+
+		return nil
+	}
+	needUpdate := false
+
+	if service.Spec.Type != corev1.ServiceTypeClusterIP {
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+		needUpdate = true
+	}
+	// Prevent labels from being deleted by mistake
+	labels := svc.getServiceLabels(cluster.Name,resources.AppKubeComponentDashboard)
+	if svc.updateServiceLabel(service, labels) {
+		needUpdate = true
+	}
+
+	if svc.updateServiceSelector(service, labels) {
+		needUpdate = true
+	}
+
+	// Ensure that the port meets the latest setting
+	ports := []corev1.ServicePort{
+		{Name: "client", Port: 8080, Protocol: corev1.ProtocolTCP, TargetPort: intstr.IntOrString{IntVal: 8080}},
+	}
+	if svc.updateServicePort(service, ports) {
+		needUpdate = true
+	}
+
+	// update ownerReferences
+	if svc.updateOwnerReferences(cluster.Name, cluster.UID, service) {
+		needUpdate = true
+	}
+
+	if !needUpdate {
+		return nil
+	}
+
+	if err := svc.updateService(service); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (svc ServiceManager) getServiceLabels(clusterName,componentName string) map[string]string {
+
+	labels := make(map[string]string)
+	labels[resources.AppKubeNameLabelKey] = resources.AppKubeNameLabelValue
+	labels[resources.AppkubeManagedByLabelKey] = resources.AppkubeManagedByLabelValue
+	labels[resources.AppKubeInstanceLabelKey] = clusterName
+	labels[resources.AppKubeComponentLabelKey] = componentName
+
+	return labels
 }

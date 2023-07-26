@@ -155,6 +155,9 @@ func (great GreatDBManager) restartCluster(cluster *v1alpha1.GreatDBPaxos, podIn
 		cluster.Spec.Restart.Enable = false
 		return nil
 	}
+	if _,ok := cluster.Status.RestartMember.Restarted[podIns.Name];ok{
+		return nil
+	}
 
 	if !podIns.DeletionTimestamp.IsZero() {
 		cluster.Status.RestartMember.Restarting[podIns.Name] = resources.GetNowTimeToString()

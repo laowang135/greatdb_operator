@@ -46,6 +46,7 @@ const (
 
 	AppKubeComponentLabelKey = "app.kubernetes.io/component"
 	AppKubeComponentGreatDB  = "GreatDB"
+	AppKubeComponentDashboard  = "Dashboard"
 
 	AppkubeManagedByLabelKey = "app.kubernetes.io/managed-by"
 

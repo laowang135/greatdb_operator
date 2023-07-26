@@ -1,0 +1,92 @@
+---
+server:
+  http_listen_port: 3001
+  grpc_listen_port: 0
+
+positions:
+  filename: /promtail_positions.yaml
+
+clients:
+  - url: "${LOKI_CLIENT}"
+
+scrape_configs:
+  - job_name: router_instance_scrape
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          type: instance
+          app: router
+          host: "${FQDN}"
+          port: "${INSTANCE_INTERIOR_PORT}"
+          __path__: /greatdb/dbscale/logs/dbscale.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:\s\d+\-\d+\-\d+.*'
+      - regex:
+          expression: '^# Time:\s(?P<time>\d+\-\d+\-\d+.*)'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  - job_name: router_audit_scrape
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          type: audit
+          app: router
+          host: "${FQDN}"
+          port: "${INSTANCE_INTERIOR_PORT}"
+          __path__: /greatdb/dbscale/logs/dbscale.log_audit
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:\s\d+\-\d+\-\d+.*'
+      - regex:
+          expression: '^# Time:\s(?P<time>\d+\-\d+\-\d+.*)'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  - job_name: db_instance_scrape
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          type: instance
+          app: db
+          host: "${FQDN}"
+          port: "${INSTANCE_INTERIOR_PORT}"
+          __path__: /greatdb/mysql/logfile/error.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:\s\d+\-\d+\-\d+.*'
+      - regex:
+          expression: '^# Time:\s(?P<time>\d+\-\d+\-\d+.*)'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  - job_name: db_slow_scrape
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          type: slow
+          app: db
+          host: "${FQDN}"
+          port: "${INSTANCE_INTERIOR_PORT}"
+          __path__: /greatdb/mysql/logfile/slow.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:\s\d+\-\d+\-\d+.*'
+      - regex:
+          expression: '^# Time:\s(?P<time>\d+\-\d+\-\d+.*)'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+limits_config:
+  readline_rate_enabled: true
+  readline_rate: 2000
+  readline_burst: 2000
+  readline_rate_drop: false

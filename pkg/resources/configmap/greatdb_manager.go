@@ -166,7 +166,6 @@ func (greatdb *greatdbConfigManager) GetLabels(name string) (labels map[string]s
 	labels[resources.AppKubeNameLabelKey] = resources.AppKubeNameLabelValue
 	labels[resources.AppkubeManagedByLabelKey] = resources.AppkubeManagedByLabelValue
 	labels[resources.AppKubeInstanceLabelKey] = name
-	labels[resources.AppKubeComponentLabelKey] = resources.AppKubeComponentGreatDB
 	return
 
 }

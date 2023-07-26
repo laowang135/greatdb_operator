@@ -25,6 +25,9 @@ const (
 	greatdbConfigMountPath    string = "/etc/greatdb/"
 	greatdbDataMountPath      string = "/greatdb/mysql/"
 	greatdbBackupMountPath    string = "/backup/"
+	dashboardDataMountPath string = "/data"
+	
+	DashboardContainerName        = "dashboard"
 	GreatDBContainerName             = "greatdb"
 	GreatDBAgentContainerName        = "greatdb-agent"
 	BackupServerPort                 = 19999
