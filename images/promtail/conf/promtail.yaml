@@ -4,7 +4,7 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: /promtail_positions.yaml
+  filename: /greatdb/promtail_positions.yaml
 
 clients:
   - url: "${LOKI_CLIENT}"

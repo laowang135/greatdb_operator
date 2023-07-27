@@ -8,19 +8,17 @@ import (
 	"greatdb-operator/pkg/apis/greatdb/v1alpha1"
 	deps "greatdb-operator/pkg/controllers/dependences"
 	"greatdb-operator/pkg/resources"
-	"greatdb-operator/pkg/resources/service"
 	dblog "greatdb-operator/pkg/utils/log"
 	"net/http"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/util/retry"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	
+	"k8s.io/client-go/util/retry"
 )
 
 type DashboardManager struct {
@@ -63,9 +61,8 @@ func (dashboard DashboardManager) SyncClusterTopo(cluster *v1alpha1.GreatDBPaxos
 		return nil
 	}
 
-	ns := cluster.Namespace
-	clusterDomain := cluster.GetClusterDomain()
-	serverAddr := cluster.Name + resources.ComponentGreatDBSuffix
+
+	serverAddr := cluster.Name + resources.ServiceWrite
 	// Get the cluster account password from secret
 	user, password := resources.GetClusterUser(cluster)
 
@@ -83,22 +80,21 @@ func (dashboard DashboardManager) SyncClusterTopo(cluster *v1alpha1.GreatDBPaxos
 	reader := bytes.NewReader(bytesData)
 
 	dashboardName := cluster.Name + resources.ComponentDashboardSuffix
-	svcName := dashboardName
-	syncUrlFmt := "http://%s.%s.%s.svc.%s:8080/gdbc/api/v1/cluster/init_cluster/"
-	dashboardSyncUrl := fmt.Sprintf(syncUrlFmt, dashboardName, svcName, ns, clusterDomain)
+	syncUrlFmt := "http://%s:8080/gdbc/api/v1/cluster/init_cluster/"
+	dashboardSyncUrl := fmt.Sprintf(syncUrlFmt, dashboardName)
 
-	// dashboardSyncUrl = "http://172.17.120.143:30500/gdbc/api/v1/cluster/init_cluster/"
+	dashboardSyncUrl = "http://172.17.120.143:30500/gdbc/api/v1/cluster/init_cluster/"
 
 	request, err := http.NewRequest("POST", dashboardSyncUrl, reader)
 	if err != nil {
-		fmt.Println(err.Error())
+		dblog.Log.Error(err.Error())
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json;charset=UTF-8")
 	client := http.Client{}
 	resp, err := client.Do(request)
 	if err != nil {
-		fmt.Println(err.Error())
+		dblog.Log.Error(err.Error())
 		return err
 	}
 	syncRes := fmt.Sprintf("Sync cluster response StatusCode %d:", resp.StatusCode)
@@ -345,7 +341,7 @@ func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, us
 
 	metaDBHost := ""
 	if defaultMetadata != "local" {
-		metaDBHost = cluster.Name + string(service.GreatDBServiceWrite) + fmt.Sprintf(":%d", cluster.Spec.Port)
+		metaDBHost = cluster.Name + resources.ServiceWrite + fmt.Sprintf(":%d", cluster.Spec.Port)
 	}
 
 	env = []corev1.EnvVar{

@@ -65,4 +65,4 @@ spec:
     enable: true
     image: 172.17.120.107:5000/greatadm-cdbc:v1.0.0-cloud-45aefe7
   logCollection:
-    image: 172.17.120.107:5000/promtail:v2.7.4-07261054
+    image: 172.17.120.107:5000/promtail:v2.7.4-07261819
