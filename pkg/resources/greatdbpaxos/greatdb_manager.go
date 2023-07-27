@@ -695,12 +695,9 @@ func (great GreatDBManager) newPromtailContainers(serviceName string, cluster *v
 	}
 	lokiClient := cluster.Spec.LogCollection.LokiClient
 	if lokiClient == "" {
-		clusterDomain := cluster.GetClusterDomain()
-		dashboardName := cluster.Name + resources.ComponentDashboardSuffix
-		svcName := dashboardName
-		ns := cluster.Namespace
-		dashboardUriStr := "http://%s.%s.%s.svc.%s:8080/log-monitor/loki/api/v1/push"
-		lokiClient = fmt.Sprintf(dashboardUriStr, dashboardName, svcName, ns, clusterDomain)
+		svcName := cluster.Name + resources.ComponentDashboardSuffix
+		dashboardUriStr := "http://%s:8080/log-monitor/loki/api/v1/push"
+		lokiClient = fmt.Sprintf(dashboardUriStr, svcName)
 	}
 	env := great.newGreatDBEnv(serviceName, cluster)
 	envForm := great.newGreatDBEnvForm(cluster.Spec.SecretName)
