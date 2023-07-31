@@ -278,6 +278,10 @@ func (great GreatDBManager) GetPv(pvName string) (pv *corev1.PersistentVolume, e
 
 func (great GreatDBManager) AllowVolumeExpansion(pvc *corev1.PersistentVolumeClaim) (allow bool, reason string, err error) {
 
+	if pvc.Spec.StorageClassName == nil{
+		reason = fmt.Sprintf("PVC %s/%s is not bound to a storage class, and the cluster environment has not set a default storage class", pvc.Namespace, pvc.Name)
+		return allow, reason, nil
+	}
 	storageClassName := *pvc.Spec.StorageClassName
 	if storageClassName == "" {
 		reason = fmt.Sprintf("PVC %s/%s is not bound to a storage class, and the cluster environment has not set a default storage class", pvc.Namespace, pvc.Name)

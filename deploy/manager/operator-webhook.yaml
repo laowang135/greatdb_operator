@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: greatdbpaxos-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: operator
+      app.kubernetes.io/name: greatdbpaxos-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: operator
+        app.kubernetes.io/name: greatdbpaxos-operator
+    spec:
+      serviceAccountName: greatdbpaxos-operator
+      containers:
+      - name: operator
+        image: 172.17.120.107:5000/greatdbpaxos-operator:v0.1-06051559          
+        command:
+        - /greatdb-operator
+        - --webhooks=true
+        - --port=443 
+        imagePullPolicy: IfNotPresent
+        livenessProbe:  # 监控检查配置，端口不可修改
+          httpGet:
+            path: /healthz
+            port: 8080
+        resources:
+          limits:
+            cpu: 4
+            memory: 4Gi
+          requests:
+            cpu: 4
+            memory: 4Gi
+        volumeMounts:
+        - name: volume-secret
+          mountPath: /etc/certs/
+      volumes:
+      - name: volume-secret
+        secret:
+          secretName: greatdbpaxos-operator    # 修改为你自己创建的secret名
