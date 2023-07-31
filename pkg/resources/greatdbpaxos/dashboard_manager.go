@@ -22,9 +22,8 @@ import (
 )
 
 type DashboardManager struct {
-	Client   *deps.ClientSet
-	Lister   *deps.Listers
-
+	Client *deps.ClientSet
+	Lister *deps.Listers
 }
 
 func (dashboard *DashboardManager) Sync(cluster *v1alpha1.GreatDBPaxos) (err error) {
@@ -33,11 +32,9 @@ func (dashboard *DashboardManager) Sync(cluster *v1alpha1.GreatDBPaxos) (err err
 		return nil
 	}
 
-	if cluster.Status.Status != v1alpha1.ClusterStatusOnline{
+	if cluster.Status.Status != v1alpha1.ClusterStatusOnline {
 		return nil
 	}
-
-	
 
 	if err = dashboard.CreateOrUpdateDashboard(cluster); err != nil {
 
@@ -61,7 +58,6 @@ func (dashboard DashboardManager) SyncClusterTopo(cluster *v1alpha1.GreatDBPaxos
 		return nil
 	}
 
-
 	serverAddr := cluster.Name + resources.ServiceWrite
 	// Get the cluster account password from secret
 	user, password := resources.GetClusterUser(cluster)
@@ -72,6 +68,7 @@ func (dashboard DashboardManager) SyncClusterTopo(cluster *v1alpha1.GreatDBPaxos
 	syncCluster["cluster_name"] = cluster.Name
 	syncCluster["username"] = user
 	syncCluster["password"] = password
+	syncCluster["gdbc_type"] = "mgr"
 	bytesData, err := json.Marshal(syncCluster)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -173,8 +170,6 @@ func (dashboard DashboardManager) createDashboard(cluster *v1alpha1.GreatDBPaxos
 
 }
 
-
-
 // GetLabels  Return to the default label settings
 func (dashboard DashboardManager) GetLabels(name string) (labels map[string]string) {
 
@@ -184,7 +179,6 @@ func (dashboard DashboardManager) GetLabels(name string) (labels map[string]stri
 	labels[resources.AppKubeInstanceLabelKey] = name
 	labels[resources.AppKubeComponentLabelKey] = resources.AppKubeComponentDashboard
 
-
 	return
 
 }
@@ -193,12 +187,11 @@ func (dashboard DashboardManager) newDashboardPod(cluster *v1alpha1.GreatDBPaxos
 	name := cluster.Name + resources.ComponentDashboardSuffix
 	secretName := cluster.Spec.SecretName
 
-	
 	serviceName := cluster.Name + resources.ComponentDashboardSuffix
 
 	initContainers := dashboard.newInitContainers(serviceName, cluster)
 	containers := dashboard.newContainers(secretName, serviceName, cluster)
-	volume := dashboard.newVolumes( cluster)
+	volume := dashboard.newVolumes(cluster)
 	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
 	// update Affinity
 	affinity := cluster.Spec.Affinity
@@ -211,11 +204,11 @@ func (dashboard DashboardManager) newDashboardPod(cluster *v1alpha1.GreatDBPaxos
 
 	pod = &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Namespace: cluster.Namespace,
-			Finalizers: []string{resources.FinalizersGreatDBCluster},
+			Name:            name,
+			Namespace:       cluster.Namespace,
+			Finalizers:      []string{resources.FinalizersGreatDBCluster},
 			OwnerReferences: []metav1.OwnerReference{owner},
-			Labels: dashboard.GetLabels(cluster.Name),
+			Labels:          dashboard.GetLabels(cluster.Name),
 		},
 		Spec: corev1.PodSpec{
 			InitContainers:    initContainers,
@@ -228,7 +221,7 @@ func (dashboard DashboardManager) newDashboardPod(cluster *v1alpha1.GreatDBPaxos
 		},
 	}
 
-	return 
+	return
 
 }
 
@@ -304,7 +297,7 @@ func (dashboard DashboardManager) newDashboardContainers(secretName, serviceName
 }
 
 func (dashboard DashboardManager) newInitDashboardContainers(serviceName string, cluster *v1alpha1.GreatDBPaxos) (container corev1.Container) {
-	clusterDomain :=cluster.GetClusterDomain()
+	clusterDomain := cluster.GetClusterDomain()
 	user, pwd := resources.GetClusterUser(cluster)
 	env := dashboard.newDashboardEnv(serviceName, clusterDomain, user, pwd, cluster)
 	imagePullPolicy := corev1.PullIfNotPresent
@@ -332,16 +325,10 @@ func (dashboard DashboardManager) newInitDashboardContainers(serviceName string,
 
 func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, user, pwd string, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
 	monitorRemoteWrite := cluster.Spec.Dashboard.Config["monitorRemoteWrite"]
-	defaultMetadata := cluster.Spec.Dashboard.Config["defaultMetadata"]
 	permissionCheckUrl := cluster.Spec.Dashboard.Config["permissionCheckUrl"]
 	lokiRemoteStorage := cluster.Spec.Dashboard.Config["lokiRemoteStorage"]
 	if !strings.HasPrefix(permissionCheckUrl, "http") {
 		permissionCheckUrl = "http://localhost:8099/gdbc/api/v1/cluster/init_cluster/verifyPermission"
-	}
-
-	metaDBHost := ""
-	if defaultMetadata != "local" {
-		metaDBHost = cluster.Name + resources.ServiceWrite + fmt.Sprintf(":%d", cluster.Spec.Port)
 	}
 
 	env = []corev1.EnvVar{
@@ -416,22 +403,6 @@ func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, us
 			Value: lokiRemoteStorage,
 		},
 		{
-			Name:  "ADM_METADB_USER",
-			Value: user,
-		},
-		{
-			Name:  "ADM_METADB_PASSWORD",
-			Value: pwd,
-		},
-		{
-			Name:  "ADM_METADB_HOST",
-			Value: metaDBHost,
-		},
-		{
-			Name:  "ADM_METADB_DBNAME",
-			Value: "dbscale_dashboard",
-		},
-		{
 			Name:  resources.ClusterUserKey,
 			Value: user,
 		},
@@ -443,7 +414,7 @@ func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, us
 	return
 }
 
-func (dashboard DashboardManager) newVolumes( cluster *v1alpha1.GreatDBPaxos) (volumes []corev1.Volume) {
+func (dashboard DashboardManager) newVolumes(cluster *v1alpha1.GreatDBPaxos) (volumes []corev1.Volume) {
 	if cluster.Spec.Dashboard.PersistentVolumeClaimSpec.Resources.Requests.Storage().IsZero() {
 		volumes = []corev1.Volume{
 			{
@@ -528,8 +499,6 @@ func (dashboard DashboardManager) updateDashboard(cluster *v1alpha1.GreatDBPaxos
 
 	return nil
 }
-
-
 
 func (dashboard DashboardManager) updatePod(pod *corev1.Pod) error {
 
