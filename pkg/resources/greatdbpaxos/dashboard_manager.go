@@ -18,12 +18,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 )
 
 type DashboardManager struct {
 	Client *deps.ClientSet
 	Lister *deps.Listers
+	Recorder record.EventRecorder
 }
 
 func (dashboard *DashboardManager) Sync(cluster *v1alpha1.GreatDBPaxos) (err error) {
@@ -36,17 +38,15 @@ func (dashboard *DashboardManager) Sync(cluster *v1alpha1.GreatDBPaxos) (err err
 		return nil
 	}
 
+	if err = dashboard.syncPvc(cluster);err != nil{
+		return err
+	}
+
 	if err = dashboard.CreateOrUpdateDashboard(cluster); err != nil {
-
-		return nil
-	}
-	if !cluster.DeletionTimestamp.IsZero() {
-		return nil
+		return err
 	}
 
-	if err = dashboard.SyncClusterTopo(cluster); err == nil {
-		return nil
-	}
+	
 
 	return nil
 
@@ -77,8 +77,8 @@ func (dashboard DashboardManager) SyncClusterTopo(cluster *v1alpha1.GreatDBPaxos
 	reader := bytes.NewReader(bytesData)
 
 	dashboardName := cluster.Name + resources.ComponentDashboardSuffix
-	syncUrlFmt := "http://%s:8080/gdbc/api/v1/cluster/init_cluster/"
-	dashboardSyncUrl := fmt.Sprintf(syncUrlFmt, dashboardName)
+	syncUrlFmt := "http://%s.%s.svc.%s:8080/gdbc/api/v1/cluster/init_cluster/"
+	dashboardSyncUrl := fmt.Sprintf(syncUrlFmt, dashboardName,cluster.Namespace,cluster.GetClusterDomain())
 
 	dashboardSyncUrl = "http://172.17.120.143:30500/gdbc/api/v1/cluster/init_cluster/"
 
@@ -130,7 +130,18 @@ func (dashboard DashboardManager) CreateOrUpdateDashboard(cluster *v1alpha1.Grea
 		return err
 	}
 
-	dblog.Log.Infof("Successfully update the greatdb statefulset %s/%s", ns, dashBoardName)
+	for _, con := range pod.Status.Conditions{
+		if con.Status == corev1.ConditionTrue && con.Type == corev1.ContainersReady{
+			if err = dashboard.SyncClusterTopo(cluster); err == nil {
+				return nil
+			}
+			break
+		}
+	}
+
+	
+
+	dblog.Log.Infof("Successfully update the greatdb-dashboard pod %s/%s", ns, dashBoardName)
 
 	return nil
 }
@@ -191,7 +202,7 @@ func (dashboard DashboardManager) newDashboardPod(cluster *v1alpha1.GreatDBPaxos
 
 	initContainers := dashboard.newInitContainers(serviceName, cluster)
 	containers := dashboard.newContainers(secretName, serviceName, cluster)
-	volume := dashboard.newVolumes(cluster)
+	volume := dashboard.newVolumes(cluster,name)
 	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
 	// update Affinity
 	affinity := cluster.Spec.Affinity
@@ -218,6 +229,7 @@ func (dashboard DashboardManager) newDashboardPod(cluster *v1alpha1.GreatDBPaxos
 			SecurityContext:   &cluster.Spec.PodSecurityContext,
 			ImagePullSecrets:  cluster.Spec.ImagePullSecrets,
 			Affinity:          affinity,
+			
 		},
 	}
 
@@ -258,8 +270,8 @@ func (dashboard DashboardManager) newContainers(secretName, serviceName string, 
 func (dashboard DashboardManager) newDashboardContainers(secretName, serviceName string, cluster *v1alpha1.GreatDBPaxos) (container corev1.Container) {
 	clusterDomain := cluster.GetClusterDomain()
 
-	user, pwd := resources.GetClusterUser(cluster)
-	env := dashboard.newDashboardEnv(serviceName, clusterDomain, user, pwd, cluster)
+	env := dashboard.newDashboardEnv(serviceName, clusterDomain, cluster)
+	envForm := dashboard.newSecretEnvForm(cluster.Spec.SecretName)
 	imagePullPolicy := corev1.PullIfNotPresent
 	if cluster.Spec.ImagePullPolicy != "" {
 		imagePullPolicy = cluster.Spec.ImagePullPolicy
@@ -268,6 +280,7 @@ func (dashboard DashboardManager) newDashboardContainers(secretName, serviceName
 	container = corev1.Container{
 		Name:            DashboardContainerName,
 		Env:             env,
+		EnvFrom: envForm,
 		Image:           cluster.Spec.Dashboard.Image,
 		Resources:       cluster.Spec.Dashboard.Resources,
 		ImagePullPolicy: imagePullPolicy,
@@ -298,8 +311,8 @@ func (dashboard DashboardManager) newDashboardContainers(secretName, serviceName
 
 func (dashboard DashboardManager) newInitDashboardContainers(serviceName string, cluster *v1alpha1.GreatDBPaxos) (container corev1.Container) {
 	clusterDomain := cluster.GetClusterDomain()
-	user, pwd := resources.GetClusterUser(cluster)
-	env := dashboard.newDashboardEnv(serviceName, clusterDomain, user, pwd, cluster)
+	env := dashboard.newDashboardEnv(serviceName, clusterDomain, cluster)
+	envForm := dashboard.newSecretEnvForm(cluster.Spec.SecretName)
 	imagePullPolicy := corev1.PullIfNotPresent
 	if cluster.Spec.ImagePullPolicy != "" {
 		imagePullPolicy = cluster.Spec.ImagePullPolicy
@@ -307,6 +320,7 @@ func (dashboard DashboardManager) newInitDashboardContainers(serviceName string,
 	container = corev1.Container{
 		Name:            DashboardContainerName + "-init",
 		Env:             env,
+		EnvFrom: envForm,
 		Command:         []string{"sh", "scripts/prestart.sh"},
 		WorkingDir:      "/app",
 		Image:           cluster.Spec.Dashboard.Image,
@@ -323,7 +337,7 @@ func (dashboard DashboardManager) newInitDashboardContainers(serviceName string,
 	return
 }
 
-func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, user, pwd string, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
+func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain string, cluster *v1alpha1.GreatDBPaxos) (env []corev1.EnvVar) {
 	monitorRemoteWrite := cluster.Spec.Dashboard.Config["monitorRemoteWrite"]
 	permissionCheckUrl := cluster.Spec.Dashboard.Config["permissionCheckUrl"]
 	lokiRemoteStorage := cluster.Spec.Dashboard.Config["lokiRemoteStorage"]
@@ -402,19 +416,25 @@ func (dashboard DashboardManager) newDashboardEnv(serviceName, clusterDomain, us
 			Name:  "LOKI_REMOTE_STORAGE",
 			Value: lokiRemoteStorage,
 		},
-		{
-			Name:  resources.ClusterUserKey,
-			Value: user,
-		},
-		{
-			Name:  resources.ClusterUserPasswordKey,
-			Value: pwd,
-		},
+		
 	}
 	return
 }
 
-func (dashboard DashboardManager) newVolumes(cluster *v1alpha1.GreatDBPaxos) (volumes []corev1.Volume) {
+func (dashboard DashboardManager) newSecretEnvForm(secretName string) (env []corev1.EnvFromSource) {
+	env = []corev1.EnvFromSource{
+		{
+			SecretRef: &corev1.SecretEnvSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+			},
+		},
+	}
+	return env
+}
+
+func (dashboard DashboardManager) newVolumes(cluster *v1alpha1.GreatDBPaxos,pvcName string) (volumes []corev1.Volume) {
 	if cluster.Spec.Dashboard.PersistentVolumeClaimSpec.Resources.Requests.Storage().IsZero() {
 		volumes = []corev1.Volume{
 			{
@@ -424,8 +444,20 @@ func (dashboard DashboardManager) newVolumes(cluster *v1alpha1.GreatDBPaxos) (vo
 				},
 			},
 		}
+		return volumes
 	}
-	return
+
+	volumes = []corev1.Volume{
+		{
+			Name: resources.GreatdbPvcDataName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: pvcName,
+				},
+			},
+		},
+	}
+	return volumes
 }
 
 func (dashboard DashboardManager) updateDashboard(cluster *v1alpha1.GreatDBPaxos, podIns *corev1.Pod) error {
@@ -551,3 +583,82 @@ func (dashboard DashboardManager) updateAnnotations(pod *corev1.Pod, cluster *v1
 
 	return needUpdate
 }
+
+
+func (dashboard DashboardManager)syncPvc(cluster *v1alpha1.GreatDBPaxos)error{
+	pvcName := cluster.Name + resources.ComponentDashboardSuffix
+	pvc, err := dashboard.Lister.PvcLister.PersistentVolumeClaims(cluster.Namespace).Get(pvcName)
+	if err != nil {
+
+		if k8serrors.IsNotFound(err) {
+			return dashboard.CreatePvc(cluster, pvcName)
+		}
+		dblog.Log.Reason(err).Errorf("failed to lister pvc %s/%s", cluster.Namespace, pvcName)
+
+	}
+	newPvc := pvc.DeepCopy()
+
+	great := GreatDBManager{Client: dashboard.Client,Lister: dashboard.Lister,Recorder: dashboard.Recorder}
+
+	err = great.UpdatePvc(cluster, newPvc)
+	if err != nil {
+		return err
+	}
+
+	err = great.updatePv(newPvc, cluster.Spec.PvReclaimPolicy)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+
+
+func (dashboard DashboardManager) CreatePvc(cluster *v1alpha1.GreatDBPaxos,pvcName string) error {
+
+
+
+	pvc := dashboard.NewPvc(cluster, pvcName)
+
+	_, err := dashboard.Client.KubeClientset.CoreV1().PersistentVolumeClaims(cluster.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			//  need to add a label to the configmap to ensure that the operator can monitor it
+			labels, _ := json.Marshal(pvc.Labels)
+			data := fmt.Sprintf(`{"metadata":{"labels":%s}}`, labels)
+			_, err = dashboard.Client.KubeClientset.CoreV1().PersistentVolumeClaims(cluster.Namespace).Patch(
+				context.TODO(), pvc.Name, types.StrategicMergePatchType, []byte(data), metav1.PatchOptions{})
+			if err != nil {
+				dblog.Log.Errorf("failed to update the labels of pod, message: %s", err.Error())
+				return err
+			}
+			return nil
+		}
+	}
+	dblog.Log.Infof("successfully created PVC %s/%s", pvc.Namespace, pvc.Name)
+
+	return nil
+
+}
+
+func (dashboard DashboardManager) NewPvc(cluster *v1alpha1.GreatDBPaxos, pvcName string) (pvc *corev1.PersistentVolumeClaim) {
+
+	owner := resources.GetGreatDBClusterOwnerReferences(cluster.Name, cluster.UID)
+	pvc = &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            pvcName,
+			Namespace:       cluster.Namespace,
+			Labels:          dashboard.GetLabels(cluster.Name),
+			Finalizers:      []string{resources.FinalizersGreatDBCluster},
+			OwnerReferences: []metav1.OwnerReference{owner},
+			Annotations:     cluster.Spec.Annotations,
+		},
+		Spec: cluster.Spec.Dashboard.PersistentVolumeClaimSpec,
+	}
+	return
+
+}
+
+

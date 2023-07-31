@@ -44,7 +44,7 @@ func NewGreatDBPaxosResourceManagers(client *deps.ClientSet, listers *deps.Liste
 	configmap := &configmap.ConfigMapManager{Client: client, Listers: listers, Recorder: recorder}
 	service := &service.ServiceManager{Client: client, Listers: listers, Recorder: recorder}
 	secret := &secret.SecretManager{Client: client, Lister: listers, Recorder: recorder}
-	dashboard := &greatdbpaxos.DashboardManager{Client: client,Lister: listers}
+	dashboard := &greatdbpaxos.DashboardManager{Client: client,Lister: listers,Recorder: recorder}
 
 	gdb := &greatdbpaxos.GreatDBManager{Client: client, Lister: listers, Recorder: recorder}
 	return &GreatDBPaxosResourceManagers{

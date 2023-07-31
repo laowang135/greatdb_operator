@@ -33,6 +33,14 @@ func SetDefaultFields(cluster *v1alpha1.GreatDBPaxos) bool {
 		update = true
 	}
 
+	if SetDashboard(cluster) {
+		update = true
+	}
+
+	if SetLog(cluster) {
+		update = true
+	}
+
 	// set metadata
 	if SetMeta(cluster) {
 		update = true
@@ -153,7 +161,7 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 	// Check the cpu memory and set the minimum value
 	if cluster.Spec.Resources.Requests.Cpu().IsZero() {
 		update = true
-		cluster.Spec.Resources.Requests[corev1.ResourceCPU] = *resource.NewQuantity(3, resource.BinarySI)
+		cluster.Spec.Resources.Requests[corev1.ResourceCPU] = *resource.NewQuantity(2, resource.BinarySI)
 	}
 
 	if cluster.Spec.Resources.Limits.Cpu().Cmp(*cluster.Spec.Resources.Requests.Cpu()) == -1 {
@@ -163,7 +171,7 @@ func SetGreatDB(cluster *v1alpha1.GreatDBPaxos) bool {
 
 	if cluster.Spec.Resources.Requests.Memory().IsZero() {
 		update = true
-		cluster.Spec.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("3Gi")
+		cluster.Spec.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("2Gi")
 	}
 
 	if cluster.Spec.Resources.Limits.Memory().Cmp(*cluster.Spec.Resources.Requests.Memory()) == -1 {
@@ -273,7 +281,7 @@ func SetGreatDBAgent(cluster *v1alpha1.GreatDBPaxos) bool {
 	// Check the cpu memory and set the minimum value
 	if cluster.Spec.Backup.Resources.Requests.Cpu().IsZero() {
 		update = true
-		cluster.Spec.Backup.Resources.Requests[corev1.ResourceCPU] = *resource.NewQuantity(2, resource.BinarySI)
+		cluster.Spec.Backup.Resources.Requests[corev1.ResourceCPU] = *resource.NewQuantity(1, resource.BinarySI)
 	}
 
 	if cluster.Spec.Backup.Resources.Limits.Cpu().Cmp(*cluster.Spec.Backup.Resources.Requests.Cpu()) == -1 {
@@ -283,12 +291,106 @@ func SetGreatDBAgent(cluster *v1alpha1.GreatDBPaxos) bool {
 
 	if cluster.Spec.Backup.Resources.Requests.Memory().IsZero() {
 		update = true
-		cluster.Spec.Backup.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("2Gi")
+		cluster.Spec.Backup.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("1Gi")
 	}
 
 	if cluster.Spec.Backup.Resources.Limits.Memory().Cmp(*cluster.Spec.Backup.Resources.Requests.Memory()) == -1 {
 		update = true
 		cluster.Spec.Backup.Resources.Limits[corev1.ResourceMemory] = cluster.Spec.Backup.Resources.Requests[corev1.ResourceMemory]
+	}
+
+	return update
+}
+
+
+
+
+func SetDashboard(cluster *v1alpha1.GreatDBPaxos) bool {
+	update := false
+
+	if !cluster.Spec.Dashboard.Enable  {
+	return update
+	}
+
+
+
+	if cluster.Spec.Dashboard.Resources.Requests == nil {
+		cluster.Spec.Dashboard.Resources.Requests = make(corev1.ResourceList)
+	}
+
+	if cluster.Spec.Dashboard.Resources.Limits == nil {
+		cluster.Spec.Dashboard.Resources.Limits = make(corev1.ResourceList)
+	}
+
+	// Check the cpu memory and set the minimum value
+	if cluster.Spec.Dashboard.Resources.Requests.Cpu().IsZero() {
+		update = true
+		cluster.Spec.Dashboard.Resources.Requests[corev1.ResourceCPU] = *resource.NewQuantity(2, resource.BinarySI)
+	}
+
+	if cluster.Spec.Dashboard.Resources.Limits.Cpu().Cmp(*cluster.Spec.Dashboard.Resources.Requests.Cpu()) == -1 {
+		update = true
+		cluster.Spec.Dashboard.Resources.Limits[corev1.ResourceCPU] = cluster.Spec.Dashboard.Resources.Requests[corev1.ResourceCPU]
+	}
+
+	if cluster.Spec.Dashboard.Resources.Requests.Memory().IsZero() {
+		update = true
+		cluster.Spec.Dashboard.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("2Gi")
+	}
+
+	if cluster.Spec.Dashboard.Resources.Limits.Memory().Cmp(*cluster.Spec.Dashboard.Resources.Requests.Memory()) == -1 {
+		update = true
+		cluster.Spec.Dashboard.Resources.Limits[corev1.ResourceMemory] = cluster.Spec.Dashboard.Resources.Requests[corev1.ResourceMemory]
+	}
+	pvc := cluster.Spec.Dashboard.PersistentVolumeClaimSpec
+	size := pvc.Resources.Requests.Storage().String()
+
+	pvc, change := SetVolumeClaimTemplates(size, pvc.StorageClassName, pvc.AccessModes)
+	if change {
+		update = true
+		cluster.Spec.Dashboard.PersistentVolumeClaimSpec = pvc
+	}
+
+	return update
+}
+
+
+
+func SetLog(cluster *v1alpha1.GreatDBPaxos) bool {
+	update := false
+
+	if cluster.Spec.LogCollection.Image == "" {
+		return update
+	}
+
+
+	if cluster.Spec.LogCollection.Resources.Requests == nil {
+		cluster.Spec.LogCollection.Resources.Requests = make(corev1.ResourceList)
+	}
+
+	if cluster.Spec.LogCollection.Resources.Limits == nil {
+		cluster.Spec.LogCollection.Resources.Limits = make(corev1.ResourceList)
+	}
+
+	// Check the cpu memory and set the minimum value
+	if cluster.Spec.LogCollection.Resources.Requests.Cpu().IsZero() {
+		update = true
+		cluster.Spec.LogCollection.Resources.Requests[corev1.ResourceCPU] = resource.MustParse("300m")
+	}
+
+	if cluster.Spec.LogCollection.Resources.Limits.Cpu().Cmp(*cluster.Spec.LogCollection.Resources.Requests.Cpu()) == -1 {
+		update = true
+		cluster.Spec.LogCollection.Resources.Limits[corev1.ResourceCPU] = cluster.Spec.LogCollection.Resources.Requests[corev1.ResourceCPU]
+	}
+
+	if cluster.Spec.LogCollection.Resources.Requests.Memory().IsZero() {
+		update = true
+		cluster.Spec.LogCollection.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("300Mi")
+	}
+
+	if cluster.Spec.LogCollection.Resources.Limits.Memory().Cmp(*cluster.Spec.LogCollection.Resources.Requests.Memory()) == -1 {
+		update = true
+		cluster.Spec.LogCollection.Resources.Limits[corev1.ResourceMemory] = cluster.Spec.LogCollection.Resources.Requests[corev1.ResourceMemory]
 	}
 
 	return update
