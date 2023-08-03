@@ -48,6 +48,25 @@ scrape_configs:
           source: time
           format: RFC3339Nano
 
+  - job_name: db_audit_scrape
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          type: audit
+          app: db
+          host: "${FQDN}"
+          port: "${INSTANCE_INTERIOR_PORT}"
+          __path__: /greatdb/mysql/data/audit.log
+    pipeline_stages:
+      - multiline:
+          firstline: '^# Time:\s\d+\-\d+\-\d+.*'
+      - regex:
+          expression: '^# Time:\s(?P<time>\d+\-\d+\-\d+.*)'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
   - job_name: db_instance_scrape
     static_configs:
       - targets:
