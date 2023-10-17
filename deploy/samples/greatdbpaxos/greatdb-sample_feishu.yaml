@@ -1,22 +1,21 @@
 apiVersion: greatdb.com/v1alpha1
 kind: GreatDBPaxos
 metadata:
-  name: greatdb-sample
-#  namespace: greatdb
+  GUUuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuaskldfjmalksd mnname: greatdb-sample1
+  namespace: wang
 spec:
   backup:
     enable: true
-    #enable: false 
     nfs:
-      path: /nfs_file/greatdb_backup
-      server: 172.17.137.187
+      path: /nfs_file/greatdb_backup 
+      server: 172.17.137.187  
     resources:
       limits:
-        cpu: "1"
-        memory: 512Mi
+        cpu: "2"
+        memory: 2Gi
       requests:
         cpu: "1"
-        memory: 256Mi
+        memory: 1Gi
   clusterDomain: cluster.local
   delete: {}
   failOver:
@@ -25,7 +24,7 @@ spec:
     period: 10m
     maxInstance: 3
     maxUnavailable: 0
-  image: 172.17.136.180/wang/mysql-v8.0.26:latest 
+  image: registry.greatdb.com/operator/mysql-v8.0.26:latest
   imagePullPolicy: IfNotPresent
   instances: 3
   maintenanceMode: false
@@ -38,11 +37,11 @@ spec:
   pvReclaimPolicy: Retain
   resources:
     limits:
-      cpu: "500m"
-      memory: 1Gi
+      cpu: "2"
+      memory: 2Gi
     requests:
-      cpu: "500m"
-      memory: 1Gi
+      cpu: "2"
+      memory: 2Gi
   restart:
     mode: cluster
     strategy: rolling
@@ -60,21 +59,11 @@ spec:
   volumeClaimTemplates:
     accessModes:
     - ReadWriteOnce
-    #storageClassName: nfs-boge 
-    storageClassName: local-path 
     resources:
       requests:
         storage: 50Gi
   dashboard:
     enable: true
-    image: 172.17.136.180/wang/greatdb-dashboard:latest 
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
+    image: registry.greatdb.com/operator/greatdb-dashboard:latest
   logCollection:
-    image: 172.17.136.180/wang/promtail-v2.7.4:latest 
-    resources:
-      limits:
-        cpu: "500m"
-        memory: 500Mi
+    image: registry.greatdb.com/operator/promtail-v2.7.4:latest

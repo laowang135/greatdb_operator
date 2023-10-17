@@ -5,6 +5,17 @@ metadata:
   name: greatdbpaxos-operator-role
 rules:
 - apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+  - create
+  - patch
+- apiGroups:
   - ""
   resources:
   - configmaps
@@ -19,6 +30,7 @@ rules:
   - watch
   - create
   - patch
+#  - delete
 - apiGroups:
   - ""
   resources:
@@ -69,6 +81,7 @@ rules:
   - watch
   - create
   - patch
+#  - delete
 
 ---
 apiVersion: v1
